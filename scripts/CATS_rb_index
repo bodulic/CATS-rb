@@ -1,0 +1,191 @@
+#!/bin/bash
+#Defining usage and exiting (function)
+usage () {
+ echo "CATS-rb version 1.0.0 - genome index generation script" >&2
+ echo "USAGE ${0} [OPTIONS] GENOME" >&2
+ echo "Genome index generation options:" >&2
+ echo "-m: Maximum gene length (in bp), default: estimated from genome size" >&2
+ echo "General options:" >&2
+ echo "-t: Number of CPU threads, default: 10" >&2
+ echo "-O: Overwrite the genome index directory, default: off" >&2
+ echo "-h: Show usage information" >&2
+ exit 1
+}
+
+#Addingg date and time to log messages (function)
+write_log () {
+ local LOG_TYPE="${1}"
+ shift 1
+ local MESSAGE="${*}"
+ echo "$(date '+%d/%m/%Y %H:%M:%S'):${LOG_TYPE}: ${MESSAGE}" >&2
+}
+
+#Checking executables (function)
+check_executable () {
+ for EXECUTABLE in "${@}"
+ do
+  if ! [[ -x $(command -v "${EXECUTABLE}") ]]
+  then
+   write_log ERROR "${EXECUTABLE} could not be found. Please check the supplied path"
+   exit 1
+  fi
+ done
+}
+
+#Checking the supplied files (function)
+check_files() {
+ for FILE in "${@}"
+ do
+  if [[ -f "${FILE}" ]]
+  then
+   if ! [[ -s "${FILE}" ]]
+   then
+    write_log ERROR "${FILE} is empty"
+    exit 1
+   fi
+  else
+   write_log ERROR "${FILE} cannot be found (or is not a file). Please check the supplied path"
+   exit 1
+  fi
+ done
+}
+
+#Checking the exit status of the last command (function)
+check_exit_status () {
+ local EXIT_STATUS="${?}"
+ local MESSAGE="${*}"
+ if [[ "${EXIT_STATUS}" -ne 0 ]]
+ then
+  write_log ERROR "${MESSAGE}"
+  exit 1
+ fi
+}
+
+#Testing numerical arguments (function)
+test_numeric_arg () {
+ local NUM_REGEX='^[0-9]+(\.[0-9]+)?$'
+ local NUMERIC_ARG="${1}"
+ local VAR_NAME="${2}"
+ local ARG_DEF_VALUE="${3}"
+ shift 3
+ local MESSAGE="${*}"
+ if [[ -n "${NUMERIC_ARG}" && ! "${NUMERIC_ARG}" =~ ${NUM_REGEX} ]]
+ then
+  export "${VAR_NAME}"="${ARG_DEF_VALUE}"
+  write_log WARNING "${MESSAGE}"
+ fi
+}
+
+#Defining default parameters
+THREAD_N=10
+OVERWRITE_RES="F"
+
+#Saving the script call
+CALL="$(echo "${0} ${@}")"
+
+#Defining options
+while getopts ":m:t:Oh" OPT; do
+ case "${OPT}" in
+  m) MAX_GENE_LEN="${OPTARG}"
+     ;;
+  t) THREAD_N="${OPTARG}"
+     ;;
+  O) OVERWRITE_RES="T"
+     ;;
+  h) usage
+     ;;
+  ?) write_log ERROR "Unknown flag supplied: -${OPTARG}"
+     usage
+     ;;
+ esac
+done
+shift "$(( OPTIND - 1 ))"
+
+#Displaying usage when calling the script without arguments
+if [[ "${#}" -eq 0 ]]
+then
+ usage
+fi
+
+#Save log output to file and STDERR
+LOG_FILE="CATS_rb_index_run_$(date '+%Y%m%d_%H%M%S')"
+exec 3>&2
+exec 2> >(tee "$LOG_FILE" >&3)
+
+#Printing welcome message
+echo "Welcome to CATS-rb genome index genertion tool (version 1.0.0). Find us on www.github.com/kbodulic.com"
+
+#Checking executable requirements
+check_executable spaln
+
+#Checking if the correct number of files is supplied
+if [[ "${#}" -ne 1 ]]
+then
+ write_log ERROR "Invalid number of files supplied"
+ exit 1
+fi
+
+#Assigning positional arguments
+GENOME="${1}"
+
+#Checking the supplied file
+check_files "${GENOME}"
+
+#Checking the genome file name
+FILENAME_DOT_N=$(echo -n "$(basename "${GENOME}")" | tr -cd '.' | wc -c)
+if [[ "${FILENAME_DOT_N}" -gt 1 ]]
+then
+ GENOME_NEW="$(echo "$(basename "${GENOME}")" | sed 's/\./_/g' | sed 's/\(.*\)_/\1./')"
+else
+ GENOME_NEW="$(basename "${GENOME}")"
+fi
+
+#Adding the default directory name
+OUT_DIR="CATS_rb_index_${GENOME_NEW}"
+
+#Checking the overwrite argument
+if [[ -d "${OUT_DIR}" || -f "${OUT_DIR}" ]]
+then
+ if [[ "${OVERWRITE_RES}" = "F" ]]
+ then
+  write_log ERROR "The genome index directory already exists and the overwrite option is turned off"
+  exit 1
+ elif [[ "${OVERWRITE_RES}" = "T" ]]
+ then
+  rm -r "${OUT_DIR}"
+ fi
+fi
+
+#Testing numerical arguments
+test_numeric_arg "${MAX_GENE_LEN}" "MAX_GENE_LEN" "" "Supplied an incorrect value for the maximum gene length, defaulting to estimation from genome size"
+test_numeric_arg "${THREAD_N}" "THREAD_N" 10 "Supplied an incorrect value for the number of CPU threads, defaulting to 10"
+
+#Creating output directory
+mkdir "${OUT_DIR}"
+check_exit_status "Creating output directory failed"
+
+#Creating symbolic links
+ln -s -r -t "${OUT_DIR}" "${GENOME}"
+GENOME="$(basename "${GENOME}")"
+cd "${OUT_DIR}"
+
+#Writing the script call to file
+echo "${CALL}" > call.log
+
+#Adjusting the genome name
+if [[ "${GENOME}" != "${GENOME_NEW}" ]]
+then
+ mv "${GENOME}" "${GENOME_NEW}"
+fi
+
+#Building the genome index
+write_log INFO "Building the genome index"
+spaln -W -KD -XG"${MAX_GENE_LEN}" -t"${THREAD_N}" "${GENOME_NEW}" &> spaln_index_log
+check_exit_status "Building the genome index failed. Check the spaln_index_log file"
+
+#Cleaning up
+rm "${GENOME_NEW}" spaln_index_log
+
+#Exiting
+write_log INFO "Thank you for using CATS-rb! The genome index can be found in ${OUT_DIR}"
+exit 0

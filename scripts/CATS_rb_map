@@ -1,0 +1,291 @@
+#!/bin/bash
+#Defining usage and exiting (function)
+usage () {
+ echo "CATS-rb version 1.0.0 - transcriptome assembly mapping script" >&2
+ echo "USAGE ${0} [OPTIONS] GENOME_INDEX_DIR TRANSCRIPTOME" >&2
+ echo "Mapping options:" >&2
+ echo "-S: Enable stranded mapping, default: off" >&2
+ echo "-N: Maximum allowed mappings per transcript, default: 5" >&2
+ echo "-i: Minimum intron length (in bp), default: 20 bp" >&2
+ echo "-p: Species-specific preset (from path_to_spaln_dir/table/), default: unset" >&2
+ echo "-s: Splice site characterization option (0-3, refer to Spaln documentation), default: 2" >&2
+ echo "-P: Relative contribution of coding potential to mapping score, default: 1" >&2
+ echo "-T: Relative contribution of translation initiation signal to mapping score, default: 1" >&2
+ echo "General options:" >&2
+ echo "-t: Number of CPU threads, default: 10" >&2
+ echo "-D: Mapping output directory name, default: TRANSCRIPTOME_CATS_rb_map" >&2
+ echo "-O: Overwrite the mapping output directory, default: off" >&2
+ echo "-h: Show usage information" >&2
+ exit 1
+}
+
+#Addingg date and time to log messages (function)
+write_log () {
+ local LOG_TYPE="${1}"
+ shift 1
+ local MESSAGE="${*}"
+ echo "$(date '+%d/%m/%Y %H:%M:%S'):${LOG_TYPE}: ${MESSAGE}" >&2
+}
+
+#Checking executables (function)
+check_executable () {
+ for EXECUTABLE in "${@}"
+ do
+  if ! [[ -x $(command -v "${EXECUTABLE}") ]]
+  then
+   write_log ERROR "${EXECUTABLE} could not be found. Please check the supplied path"
+   exit 1
+  fi
+ done
+}
+
+#Checking the supplied directories (function)
+check_directories() {
+ for DIRECTORY in "${@}"
+ do
+  if [[ -d "${DIRECTORY}" ]]
+  then
+   if [[ -z $(ls "${DIRECTORY}") ]]
+   then
+    write_log ERROR "${DIRECTORY} is empty"
+    exit 1
+   fi
+  else
+   write_log ERROR "${DIRECTORY} cannot be found (or is not a directory). Please check the supplied path"
+   exit 1
+  fi
+ done
+}
+
+#Checking the supplied files (function)
+check_files() {
+ for FILE in "${@}"
+ do
+  if [[ -f "${FILE}" ]]
+  then
+   if ! [[ -s "${FILE}" ]]
+   then
+    write_log ERROR "${FILE} is empty"
+    exit 1
+   fi
+  else
+   write_log ERROR "${FILE} cannot be found (or is not a file). Please check the supplied path"
+   exit 1
+  fi
+ done
+}
+
+#Checking the exit status of the last command (function)
+check_exit_status () {
+ local EXIT_STATUS="${?}"
+ local MESSAGE="${*}"
+ if [[ "${EXIT_STATUS}" -ne 0 ]]
+ then
+  write_log ERROR "${MESSAGE}"
+  exit 1
+ fi
+}
+
+#Testing numerical arguments (function)
+test_numeric_arg () {
+ local NUM_REGEX='^[0-9]+(\.[0-9]+)?$'
+ local NUMERIC_ARG="${1}"
+ local VAR_NAME="${2}"
+ local ARG_DEF_VALUE="${3}"
+ shift 3
+ local MESSAGE="${*}"
+ if [[ -n "${NUMERIC_ARG}" && ! "${NUMERIC_ARG}" =~ ${NUM_REGEX} ]]
+ then
+  export "${VAR_NAME}"="${ARG_DEF_VALUE}"
+  write_log WARNING "${MESSAGE}"
+ fi
+}
+
+#Defining default parameters
+STRANDNESS=3
+SAME_TR_MAP_N=5
+MIN_INT_LEN=20
+SPLICE_OPTION=2
+CODING_MAP_CONT=1
+TRANSLATION_MAP_CONT=1
+THREAD_N=10
+OVERWRITE_RES="F"
+
+#Saving the script call
+CALL="$(echo "${0} ${@}")"
+
+#Defining options
+while getopts ":SN:i:p:s:P:T:t:D:Oh" OPT; do
+ case "${OPT}" in
+  S) STRANDNESS=1
+     ;;
+  N) SAME_TR_MAP_N="${OPTARG}"
+     ;;
+  i) MIN_INT_LEN="${OPTARG}"
+     ;;
+  p) SPECIES="-T ${OPTARG}"
+     ;;
+  s) SPLICE_OPTION="${OPTARG}"
+     ;;
+  P) CODING_MAP_CONT="${OPTARG}"
+     ;;
+  T) TRANSLATION_MAP_CONT="${OPTARG}"
+     ;;
+  t) THREAD_N="${OPTARG}"
+     ;;
+  D) OUT_DIR="${OPTARG}"
+     ;;
+  O) OVERWRITE_RES="T"
+     ;;
+  h) usage
+     ;;
+  ?) write_log ERROR "Unknown flag supplied: -${OPTARG}"
+     usage
+     ;;
+ esac
+done
+shift "$(( OPTIND - 1 ))"
+
+#Displaying usage when calling the script without arguments
+if [[ "${#}" -eq 0 ]]
+then
+ usage
+fi
+
+#Save log output to file and STDERR
+LOG_FILE="CATS_rb_map_run_$(date '+%Y%m%d_%H%M%S')"
+exec 3>&2
+exec 2> >(tee "$LOG_FILE" >&3)
+
+#Printing welcome message
+echo "Welcome to CATS-rb transcriptome assembly mapping tool (version 1.0.0). Find us on www.github.com/kbodulic.com"
+
+#Checking executable requirements
+check_executable R spaln
+
+#Checking if the correct number of files / directories is supplied
+if [[ "${#}" -ne 2 ]]
+then
+ write_log ERROR "Invalid number of files / directories supplied"
+ exit 1
+fi
+
+#Assigning positional arguments
+GENOME_INDEX_DIR="${1}"
+TRANSCRIPTOME="${2}"
+
+#Checking the supplied directory and files
+check_directories ${GENOME_INDEX_DIR}
+GENOME="$(echo "$(basename "${GENOME_INDEX_DIR}")" | sed 's/CATS_rb_index_//')"
+check_files "${GENOME_INDEX_DIR}"/"${GENOME%.*}".idx "${GENOME_INDEX_DIR}"/"${GENOME%.*}".ent "${GENOME_INDEX_DIR}"/"${GENOME%.*}".bkn "${GENOME_INDEX_DIR}"/"${GENOME%.*}".seq "${GENOME_INDEX_DIR}"/"${GENOME%.*}".grp "$TRANSCRIPTOME"
+
+#Setting the default directory name
+if [[ -z "${OUT_DIR}" ]]
+then
+ OUT_DIR="$(basename "${TRANSCRIPTOME}")_CATS_rb_map"
+fi
+
+#Checking the overwrite argument
+if [[ -d "${OUT_DIR}" || -f "${OUT_DIR}" ]]
+then
+ if [[ "${OVERWRITE_RES}" = "F" ]]
+ then
+  write_log ERROR "The mapping output directory already exists and the overwrite option is turned off"
+  exit 1
+ elif [[ "${OVERWRITE_RES}" = "T" ]]
+ then
+  rm -r "${OUT_DIR}"
+ fi
+fi
+
+#Testing the splice site characterization argument
+if [[ ! "${SPLICE_OPTION}" =~ ^[0-3]$ ]]
+then
+ SPLICE_OPTION=2
+ write_log WARNING "Supplied an incorrect value for the splice site characterization option, defaulting to 2"
+fi
+
+#Testing numerical arguments
+test_numeric_arg "${SAME_TR_MAP_N}" "SAME_TR_MAP_N" 5 "Supplied an incorrect value for the maximum allowed mappings per transcript, defaulting to 5"
+test_numeric_arg "${MIN_INT_LEN}" "MIN_INT_LEN" 20 "Supplied an incorrect value for the minimum intron length, defaulting to 20 bp"
+test_numeric_arg "${CODING_MAP_CONT}" "CODING_MAP_CONT" 1 "Supplied an incorrect value for the relative contribution of coding potential to mapping score, defaulting to 1"
+test_numeric_arg "${TRANSLATION_MAP_CONT}" "TRANSLATION_MAP_CONT" 1 "Supplied an incorrect value for the relative contribution of translation initiation signal to mapping score, defaulting to 1"
+test_numeric_arg "${THREAD_N}" "THREAD_N" 10 "Supplied an incorrect value for the number of CPU threads, defaulting to 10"
+
+#Creating output directory
+mkdir "${OUT_DIR}"
+check_exit_status "Creating output directory failed"
+
+#Creating symbolic links
+EXTENSIONS=("odr" "idx" "ent" "bkn" "seq" "grp")
+for EXTENSION in "${EXTENSIONS[@]}"
+do
+ ln -s -r -t "${OUT_DIR}" "${GENOME_INDEX_DIR}"/"${GENOME%.*}"."${EXTENSION}"
+done
+ln -s -r -t "${OUT_DIR}" "$TRANSCRIPTOME"
+TRANSCRIPTOME="$(basename "${TRANSCRIPTOME}")"
+cd "${OUT_DIR}"
+
+#Writing the script call to file
+echo "${CALL}" > call.log
+
+#Cleaning up transcript headers
+sed -r 's/^(>\S+)\s.*/\1/' "${TRANSCRIPTOME}" > "${TRANSCRIPTOME}_onew_h"
+rm "${TRANSCRIPTOME}"
+
+#Calculating general transcriptome assembly statistics
+write_log INFO "Calculating general transcriptome assembly statistics"
+awk '/^>/ { if (seq) print name "\t" length(seq); name = substr($0, 2); seq = ""; next } { seq = seq $0 } END { print name "\t" length(seq) }' "${TRANSCRIPTOME}_onew_h" > "${TRANSCRIPTOME}_lengths.tsv"
+CATS_general_assembly_stats.R "${THREAD_N}" "${TRANSCRIPTOME}_lengths.tsv" "${TRANSCRIPTOME}"
+check_exit_status "General transcriptome assembly statistics calculation failed"
+GC_CONTENT="$(awk '!/^>/ { gc_con += gsub(/[cCgG]/, ""); at_con += gsub(/[tTaA]/, ""); } END { printf "%.2f%%\n", (100 * gc_con) / (gc_con + at_con); }' "${TRANSCRIPTOME}_onew_h")"
+echo -e "GC content (%)\t${GC_CONTENT}" >> "${TRANSCRIPTOME}_general_statistics_table.tsv"
+
+#Mapping the transcriptome assembly to the referent genome
+write_log INFO "Mapping the transcriptome assembly to the referent genome"
+spaln -Q7 -S "${STRANDNESS}" -M"${SAME_TR_MAP_N}" -yL "${MIN_INT_LEN}" ${SPECIES} -ya "${SPLICE_OPTION}" -yz "${CODING_MAP_CONT}" -yA "${TRANSLATION_MAP_CONT}" -O 4 -t"${THREAD_N}" -d "${GENOME%.*}" "${TRANSCRIPTOME}_onew_h" > "${TRANSCRIPTOME}_mapped_tmp" 2> spaln_log
+
+#Checking if a transcript failed to map - removing such transcripts and retrying
+if [[ "${?}" -ne 0 ]]
+then
+ COUNTER=1
+ while [[ -z "${MAPPED}" ]]
+ do
+  if ! [[ -s "${TRANSCRIPTOME}_mapped_tmp" ]]
+  then
+   write_log ERROR "Transcriptome assembly failed to map. Check the spaln_log file and refer to CATS-rb documentation"
+   exit 1
+  fi
+  REMOVE_TRANS="$(cat "${TRANSCRIPTOME}_mapped_tmp" | sed '/^@/d;/^#/d' |  awk -F'\t' 'END{print $1}')"
+  if [[ "${COUNTER}" -eq 1 ]]
+  then
+   sed -e "/^>${REMOVE_TRANS}/,+1d" "${TRANSCRIPTOME}_onew_h" > "${TRANSCRIPTOME}_onew_h_1"
+  else
+   sed -e "/^>${REMOVE_TRANS}/,+1d" "${TRANSCRIPTOME}_onew_h_$((COUNTER - 1))" > "${TRANSCRIPTOME}_onew_h_${COUNTER}" && rm "${TRANSCRIPTOME}_onew_h_$((COUNTER - 1))"
+  fi
+  write_log WARNING "${REMOVE_TRANS} failed to map. retrying without the stated trasncript: ${COUNTER} out of 5 attempts"
+  spaln -Q7 -S "${STRANDNESS}" -M"${SAME_TR_MAP_N}" -yL "${MIN_INT_LEN}" ${SPECIES} -ya "${SPLICE_OPTION}" -yz "${CODING_MAP_CONT}" -yA "${TRANSLATION_MAP_CONT}" -O 4 -t"${THREAD_N}" -d "${GENOME%.*}" "${TRANSCRIPTOME}_onew_h_${COUNTER}" > "${TRANSCRIPTOME}_mapped_tmp" 2> spaln_log
+  if [[ "${?}" -ne 0 && "${COUNTER}" -lt 5 ]]
+  then
+   ((COUNTER=COUNTER+1))
+  elif [[ "${?}" -ne 0 && "${COUNTER}" -eq 5 ]]
+  then
+   write_log ERROR "Transcriptome assembly failed to map. Check the spaln_log file and refer to CATS-rb documentation"
+   exit 1
+  else
+   MAPPED="T"
+   rm "${TRANSCRIPTOME}_onew_h_${COUNTER}"
+  fi
+ done
+fi
+
+#Processing the mapping results
+cat "${TRANSCRIPTOME}_mapped_tmp" | sed '/^@/d;/^#/d' | awk 'NF > 1' | cut -f 1,2,3,7,8,9,10 > "${TRANSCRIPTOME}_mapped.tsv"
+
+#Cleaning up
+rm "${GENOME%.*}".odr "${GENOME%.*}".idx "${GENOME%.*}".ent "${GENOME%.*}".bkn "${GENOME%.*}".seq "${GENOME%.*}".grp 2> /dev/null
+rm "${TRANSCRIPTOME}_onew_h" "${TRANSCRIPTOME}_mapped_tmp" spaln_log
+
+#Exiting
+write_log INFO "Thank you for using CATS-rb! The transcriptome assembly mapping output can be found in ${OUT_DIR}"
+exit 0

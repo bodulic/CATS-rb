@@ -1,0 +1,2018 @@
+---
+title: "CATS-rb transcriptome assembly comparison"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+ html_document:
+  toc: true
+  toc_depth: 4
+  toc_float: true
+  smooth_scroll: true
+  number_sections: false
+  theme: journal
+---
+
+```{r, setup, include=F}
+#Loading the required packages
+suppressPackageStartupMessages(library(knitr))
+suppressPackageStartupMessages(library(data.table))
+suppressPackageStartupMessages(library(ggplot2))
+suppressPackageStartupMessages(library(ggdist))
+suppressPackageStartupMessages(library(GenomicRanges))
+suppressPackageStartupMessages(library(Matrix))
+suppressPackageStartupMessages(library(igraph))
+suppressPackageStartupMessages(library(UpSetR))
+suppressPackageStartupMessages(library(ggVennDiagram))
+suppressPackageStartupMessages(library(egg))
+suppressPackageStartupMessages(library(ComplexHeatmap))
+suppressPackageStartupMessages(library(GenomicDistributions))
+
+#Defining external arguments
+ext_args <- fread("ext_args", header = T, fill = T)
+THREAD_N <- as.numeric(ext_args[, args][1])
+RP_MAX_QUANTILE <- as.numeric(ext_args[, args][2])                     
+RP_COLORS <- unlist(strsplit(ext_args[, args][3], ","))
+FIGURE_EXT <- ext_args[, args][4]
+FIGURE_DPI <- as.numeric(ext_args[, args][5])   
+BP_COLORS <- unlist(strsplit(ext_args[, args][6], ","))
+VD_MIN_OVL_PROP <- as.numeric(ext_args[, args][7])
+VD_COLORS <- unlist(strsplit(ext_args[, args][8], ","))
+MIN_EX_SET_OVL <- as.numeric(ext_args[, args][9])
+MIN_TR_SET_OVL <- as.numeric(ext_args[, args][10])
+UP_COLORS <- unlist(strsplit(ext_args[, args][11], ","))
+COMM_EL_SET_REL_BREAKS <- unlist(strsplit(ext_args[, args][12], ","))
+TP_COLORS <- unlist(strsplit(ext_args[, args][13], ","))
+HP_EL_N <- as.numeric(ext_args[, args][14])
+HP_COLORS <- unlist(strsplit(ext_args[, args][15], ","))
+HP_RASTER <- as.logical(ext_args[, args][16])
+GP_COLORS <- unlist(strsplit(ext_args[, args][17], ","))
+MIN_EX_ID_PROP <- as.numeric(ext_args[, args][18])
+MIN_EX_LEN <- as.numeric(ext_args[, args][19])
+STRANDED <- as.logical(ext_args[, args][20])
+MAX_INT_LEN <- as.numeric(ext_args[, args][21])
+TR_ALN_PROP_BREAKS <- unlist(strsplit(ext_args[, args][22], ","))
+STR_INC_ALN_PROP <- as.numeric(ext_args[, args][23])
+STR_INC_MAX_OVL_PROP <- as.numeric(ext_args[, args][24])
+EXON_PER_TR_N_BREAKS <- unlist(strsplit(ext_args[, args][25], ","))
+LONGEST_SCAFF_N <- as.numeric(ext_args[, args][26])
+GENOMIC_BIN_N <- as.numeric(ext_args[, args][27])
+MIN_EX_SET_LEN <- as.numeric(ext_args[, args][28])
+MIN_ISO_OVL <- as.numeric(ext_args[, args][29])
+ISO_N_BREAKS <- unlist(strsplit(ext_args[, args][30], ","))
+TR_SET_PROX_LEN <- as.numeric(ext_args[, args][31])
+MIN_TR_SET_LEN <- as.numeric(ext_args[, args][32])
+MAX_TR_SET_LEN <- as.numeric(ext_args[, args][33])
+PERFORM_ANNOT_ANALYSIS <- as.logical(ext_args[, args][34])
+
+setDTthreads(THREAD_N)
+options(scipen = 999)
+```
+
+
+```{r include=F}
+#Importing data (function)
+import_data <- function(import_regex, import_category) {
+ files_in_directory <- grep(import_regex, list.files(path = "."), value = T)
+ files_in_directory <- files_in_directory[sort(as.numeric(sub("%.*", "", files_in_directory)), index.return = T)$ix]
+ imported_dt <- list()
+ if (import_category == "exon_mappings" | import_category == "tr_lengths") {
+  for(i in 1 : length(files_in_directory)) {
+   imported_dt[[i]] <- fread(files_in_directory[i], header = F)
+   imported_dt[[i]][, "full_name" := files_in_directory[i]]
+  }
+  imported_dt <- rbindlist(imported_dt) 
+ } else if (import_category == "general_statistics") {
+  for (i in 1 : length(files_in_directory)) {
+   if (i == 1) {
+    imported_dt <- fread(files_in_directory[i], header = F)
+   } else {
+    imported_dt <- cbind(imported_dt, fread(files_in_directory[i], header = F, select = 2))  
+   }
+  }
+  colnames(imported_dt)[-1] <- transcriptome_names
+ }
+ return(imported_dt)
+} 
+
+#Extracting transcriptome assembly filenames (function)
+process_filenames <- function(dt_to_process, file_regex) {
+ dt_to_process[, "full_name" := sub(file_regex, "", full_name, fixed = T)]
+ dt_to_process[, "transcriptome" := sub(".*%", "", full_name)]
+ dt_to_process[nchar(transcriptome) > 20, "transcriptome" := substr(transcriptome, 1, 20)]
+ dt_to_process[, "occurance_N" := rleid(full_name), by = "transcriptome"]
+ dt_to_process[, "full_name" := NULL]
+ dt_to_process[occurance_N != 1, "transcriptome" := paste(transcriptome, occurance_N, sep = ".")]
+ dt_to_process[, "occurance_N" := NULL]
+ return(dt_to_process)
+}
+
+#Generating results kable (function)
+display_kable <- function(dt_to_display) {
+ param_column <- dt_to_display[, 1] 
+ tr_columns <- dt_to_display[, -1]          
+ chunk_N <- ceiling(ncol(tr_columns) / KABLE_PER_CHUNK_COL_N)
+ for (i in (1 : chunk_N)) {
+  start_col <- (i - 1) * KABLE_PER_CHUNK_COL_N + 1
+  end_col <- min(i * KABLE_PER_CHUNK_COL_N, ncol(tr_columns))
+  dt_to_display <- cbind(param_column, tr_columns[, start_col : end_col])
+  colnames(dt_to_display)[1] <- "Parameter"
+  print(kable(dt_to_display))
+ }
+}
+
+#Adding missing transcriptome assemblies to a summary table (function)
+add_missing_transcriptomes <- function(dt_to_adjust, dt_to_add) {
+ if (dt_to_adjust[, length(unique(transcriptome))] != TRANSCRIPTOME_N) {
+  dt_to_adjust <- rbindlist(list(dt_to_adjust, dt_to_add))
+  dt_to_adjust[, "transcriptome" := factor(transcriptome, levels = transcriptome_names)]
+  setorder(dt_to_adjust, transcriptome) 
+ }
+ return(dt_to_adjust)
+}
+
+#Generating raincloud plot and descriptive statistics for a numerical variable (function)
+analyse_numerical_variable <- function(dt_to_analyse, variable_to_plot, plot_label_title_filename) {
+ plotted_value_min <-  min(dt_to_analyse[, get(variable_to_plot)])
+ plotted_value_max <-  quantile(dt_to_analyse[, get(variable_to_plot)], RP_MAX_QUANTILE)
+ all_transcriptomes_in_dt <- unique(dt_to_analyse[, transcriptome])
+ if (length(all_transcriptomes_in_dt) != TRANSCRIPTOME_N) {
+  dt_to_analyse <- rbindlist(list(dt_to_analyse, data.table(transcriptome = setdiff(transcriptome_names, all_transcriptomes_in_dt))), fill = T)
+ }
+ dt_to_analyse[, "transcriptome" := factor(transcriptome, levels = rev(transcriptome_names))]
+ 
+ variable_rp <- ggplot(data = dt_to_analyse, aes(x = transcriptome, y = .data[[variable_to_plot]], fill = transcriptome)) +
+  stat_halfeye(justification = -0.1, width = 0.95, .width = 0, point_colour = NA, alpha = 0.8) +
+  geom_boxplot(width = 0.1, outlier.shape = NA, alpha = 0.8) +
+  theme_bw() +
+  theme(legend.position = "none") +
+  scale_fill_manual(values = RP_COLORS) +
+  coord_flip() +
+  scale_y_log10(limits = c(plotted_value_min, plotted_value_max)) +
+  xlab("Transcriptome") +
+  ylab(plot_label_title_filename) +
+  ggtitle(paste(plot_label_title_filename, "distribution"))
+ ggsave(variable_rp, filename = paste(tolower(gsub(" ", "_", plot_label_title_filename, fixed =  T)), FIGURE_EXT, sep = "."), height = RP_HEIGHT, width = RP_WIDTH, dpi = FIGURE_DPI)
+ 
+ dt_to_analyse <- dt_to_analyse[is.na(get(variable_to_plot)) == F]
+ if (variable_to_plot != "tr_len") {
+  dt_to_analyse[, "transcriptome" := factor(transcriptome, levels = transcriptome_names)]
+  setorder(dt_to_analyse, transcriptome)
+  summary_dt <- dt_to_analyse[, .(summary_column = paste0(round(mean(get(variable_to_plot)), 2), ", ", round(quantile(get(variable_to_plot), 0.25), 2), "-", round(quantile(get(variable_to_plot), 0.75), 2))), by = "transcriptome"]
+  zero_occ_tr_dt <-  data.table(transcriptome = setdiff(transcriptome_names, all_transcriptomes_in_dt), summary_column = "No objects")
+  summary_dt <- as.list(add_missing_transcriptomes(summary_dt, zero_occ_tr_dt)[, summary_column])
+  return(summary_dt)
+ }
+}
+
+#Calculating proportions for a numerical variable (function)
+calculate_proportions <- function(dt_to_expand, size_dt) {
+ dt_to_expand <- size_dt[dt_to_expand, on = "transcriptome"]
+ dt_to_expand[, "i.N" := paste0(i.N, ", ", round(100 * i.N / N, 2), "%")]
+ zero_occ_tr_dt <- data.table(transcriptome = setdiff(transcriptome_names, dt_to_expand[, transcriptome]), N = 0 , i.N = "0, 0.00%")
+ dt_to_expand <- add_missing_transcriptomes(dt_to_expand, zero_occ_tr_dt)
+ dt_to_expand <- as.data.table(t(dt_to_expand))[3]
+ return(dt_to_expand)
+}
+
+#Generating barplot and descriptive statistics for a categorical variable (function)
+analyse_categorical_variable <- function(dt_to_analyse, variable_to_plot, break_vec, plot_legend_title_filename, y_axis_label) {
+ dt_to_analyse[, "transcriptome" := factor(transcriptome, levels = transcriptome_names)]
+ variable_to_plot_cat <- paste(variable_to_plot, "cat", sep = "_")
+ dt_to_analyse[get(variable_to_plot) < break_vec[1], (variable_to_plot_cat) := paste0("<", break_vec[1])]
+ dt_to_analyse[get(variable_to_plot) >= break_vec[1], (variable_to_plot_cat) := cut(get(variable_to_plot), breaks = break_vec, include.lowest = T)]
+ dt_to_analyse[is.na(get(variable_to_plot_cat)), (variable_to_plot_cat) := paste0(">", break_vec[length(break_vec)])]
+ dt_to_analyse[, (variable_to_plot_cat) := gsub("\\(*|\\[*|\\]*", "", get(variable_to_plot_cat))]
+ dt_to_analyse[, (variable_to_plot_cat) := sub(",", " - ", get(variable_to_plot_cat), fixed = T)]
+ setorderv(dt_to_analyse, variable_to_plot)
+ var_cat_levels <- unique(dt_to_analyse[, get(variable_to_plot_cat)])
+ dt_to_analyse[, (variable_to_plot_cat) := factor(get(variable_to_plot_cat), levels = var_cat_levels)]
+ if (length(var_cat_levels) > length(BP_COLORS)) { 
+  BP_COLORS <- colorRampPalette(BP_COLORS)(length(var_cat_levels)) 
+ }  
+ 
+ variable_bp <- ggplot(data = dt_to_analyse, aes(x = transcriptome, fill = .data[[variable_to_plot_cat]])) +
+  geom_bar(position = "fill",  width = BP_BP3_BAR_WIDTH, color = "black", alpha = 0.85) +
+  theme_bw() +
+  scale_fill_manual(values = BP_COLORS[(length(BP_COLORS) - length(var_cat_levels) + 1) : length(BP_COLORS)], name = plot_legend_title_filename) +
+  guides(fill = guide_legend(nrow = ceiling(length(var_cat_levels) / 5), byrow = T)) +
+  theme(legend.position = "top") +
+  xlab("Transcriptome") +
+  ylab(paste(y_axis_label, "proportion")) +
+  theme(axis.text.x = element_text(angle = BP_TP_BP3_AXIS_ANGLE, hjust = BP_TP_BP3_AXIS_HJUST, size = BP_HP_GP_BP3_LABEL_SIZE)) +
+  ggtitle(paste(plot_legend_title_filename, "category distribution"))
+ ggsave(variable_bp, filename = paste(tolower(gsub(" ", "_", plot_legend_title_filename, fixed =  T)), FIGURE_EXT, sep = "."), height = 5, width = BP_BP3_WIDTH, dpi = FIGURE_DPI)
+ 
+ setorder(dt_to_analyse, transcriptome)
+ summary_dt <- as.list(dt_to_analyse[, .(summary_column = paste0(round(mean(get(variable_to_plot)), 2), ", ", round(quantile(get(variable_to_plot), 0.25), 2), "-", round(quantile(get(variable_to_plot), 0.75), 2))), by = "transcriptome"][, summary_column])
+ return(summary_dt)
+}
+
+#Finding overlaps between ranges (function)
+find_overlaps <- function(range1, range2, max_ovl_gap, min_ovl_len, remove_trivial_ovl, dt_one_columns, dt_two_columns, annot_mode) {
+ overlaps <- findOverlaps(range1, range2, ignore.strand = T, maxgap = max_ovl_gap, minoverlap = min_ovl_len)
+ if (remove_trivial_ovl == T) {
+  overlaps <- overlaps[queryHits(overlaps) != subjectHits(overlaps)]
+ }
+ if (length(overlaps) == 0) {
+  return(NULL)
+ }
+ 
+ if(length(dt_two_columns) != 0) {
+  range1_overlaps <- as.data.table(range1[queryHits(overlaps)])[, ..dt_one_columns]
+  range2_overlaps <- as.data.table(range2[subjectHits(overlaps)])[, ..dt_two_columns]
+  overlap_dt <- cbind(range1_overlaps, range2_overlaps)
+  rm(range1_overlaps, range2_overlaps)
+  setnames(overlap_dt, c(paste0(dt_one_columns, 1), paste0(dt_two_columns, 2)))
+ } else {
+  overlap_dt <- as.data.table(range1[queryHits(overlaps)])[, ..dt_one_columns]
+  setnames(overlap_dt, paste0(dt_one_columns, 1))
+ }
+ 
+ if (annot_mode == T) {
+  el_set_range <- makeGRangesFromDataFrame(overlap_dt, seqnames.field = "seqnames1", start.field = "start1", end.field = "end1", ignore.strand = T, keep.extra.columns = F)
+  gtf_set_range <- makeGRangesFromDataFrame(overlap_dt, seqnames.field = "seqnames2", start.field = "start2", end.field = "end2", ignore.strand = T, keep.extra.columns = F)
+  overlap_dt[, "intersect_width" := width(pintersect(el_set_range, gtf_set_range))]
+  overlap_dt[, "el_set_ovl_prop" := intersect_width / width1]
+  overlap_dt[, "gtf_set_ovl_prop" := intersect_width / width2]
+ }
+ return(overlap_dt)
+}
+
+#Sorting vector by indices (function)
+sort_by_indices <- function(ind_vec, vec_to_sort) {
+ return(vec_to_sort[order(ind_vec)])
+}
+
+#Generating Venn diagrams (function)
+generate_venn_diagram <- function(dt_for_venn, plot_filename) {
+ variable_wd_plots <- list()
+ for(i in all_trans_pairs) {
+  first_element <- sub("(.*),pair,.*", "\\1", i)
+  second_element <- sub(".*,pair,(.*)", "\\1", i)
+  el_set_row_N_for_venn <- list(dt_for_venn[get(first_element) >= VD_MIN_OVL_PROP, .I], dt_for_venn[get(second_element) >= VD_MIN_OVL_PROP, .I])
+  
+  variable_wd <-  ggVennDiagram(el_set_row_N_for_venn, category.names = c(first_element, second_element), set_size = WD_TR_LABEL_SIZE, label = "both", label_percent_digit = 1, label_alpha = 0, label_size = WD_N_LABEL_SIZE) +
+   scale_color_manual(values = c("grey40", "grey40")) +
+   scale_fill_gradientn(colours = VD_COLORS) +
+   theme(legend.position = "none", panel.border = element_rect(fill = NA, size = 1, color = "grey40"),
+   plot.margin = ggplot2::margin(0.5, 0.5, 0.5, 0.5)) +
+   scale_x_continuous(expand = expansion(mult = .2)) 
+  variable_wd_plots[[i]] <- variable_wd
+ }
+ 
+ variable_wd_plots <- egg::ggarrange(plots = variable_wd_plots, nrow = WD_ROW_N, draw = F)
+ ggsave(variable_wd_plots, filename = paste(plot_filename, FIGURE_EXT, sep = "."), height = WD_HEIGHT_WIDTH, width = WD_HEIGHT_WIDTH, dpi = FIGURE_DPI)
+} 
+
+#Relative completeness analysis (function)
+compare_element_sets <- function(element_set_cat) {
+ if (element_set_cat == "exon set") {
+  element_set_gr <- exon_set_gr
+  element_sets <- exon_sets
+  el_set_ovl_min <- MIN_EX_SET_OVL
+ } else if (element_set_cat == "transcript set") {
+  element_set_gr <- transcript_set_gr
+  element_sets <- transcript_sets
+  el_set_ovl_min <- MIN_TR_SET_OVL
+ }
+  
+ setorder(element_sets, -width)
+ element_set_overlaps <- find_overlaps(element_set_gr, element_set_gr, -1L, el_set_ovl_min, T, "el_set_id", "el_set_id", F)
+ rm(element_set_gr)
+ if (is.null(element_set_overlaps) == F) {
+  element_set_N <- element_sets[, .N]
+  element_set_matrix <- sparseMatrix(i = element_set_overlaps[, el_set_id1], j = element_set_overlaps[, el_set_id2], dims = c(element_set_N, element_set_N))
+  rm(element_set_overlaps, element_set_N)
+  element_set_graph <- graph_from_adjacency_matrix(element_set_matrix, mode = "undirected")
+  rm(element_set_matrix)
+  element_set_groups <-  data.table(el_set_id = V(element_set_graph), group_id = components(element_set_graph)[[1]])
+  rm(element_set_graph)
+  element_sets <- element_set_groups[element_sets, on = "el_set_id"]
+  rm(element_set_groups)
+  if (element_set_cat == "exon set") {
+   unique_element_sets <- element_sets[group_id %in% element_sets[, group_id[.N == 1], by = "group_id"][, group_id]]
+  }
+  element_sets[, "el_set_id" := NULL]
+  if (element_set_cat == "transcript set") {
+   unique_element_sets <- element_sets[group_id %in% element_sets[, group_id[.N == 1], by = "group_id"][, group_id]]
+  }
+  unique_element_sets[, "group_id" := NULL]
+  if (unique_element_sets[, .N] != 0) {
+   unique_element_sets[, "transcriptome" := factor(transcriptome, levels = transcriptome_names)]
+   setorder(unique_element_sets, transcriptome) 
+  } else {
+   unique_element_sets <- NULL
+  }
+ } else {
+  rm(element_set_overlaps)
+  unique_element_sets <- element_sets
+  if (element_set_cat == "transcript set") {
+   unique_element_sets[, "el_set_id" := NULL]
+  } 
+  element_sets[, "group_id" := .I]
+ }
+ if (element_set_cat == "exon set") {
+  element_set_coords_for_range <- element_sets[, .(seqnames, start, end, group_id)]
+ }
+ element_sets[, c("seqnames", "start", "end") := NULL]
+ 
+ transcriptome_list <- element_sets[, .(transcriptome_list = list(transcriptome)), by = "group_id"][, transcriptome_list]
+ length_list <- element_sets[, .(length_list = list(width)), by = "group_id"][, length_list]
+ group_id_vec <- element_sets[, group_id]
+ rm(element_sets)
+ remove_indices_list <- lapply(transcriptome_list, function(x) which(duplicated(x)))
+ transcriptome_list <- Map(function(x, y) x[!seq_along(x) %in% y], transcriptome_list, remove_indices_list)
+ length_list <- Map(function(x, y) x[!seq_along(x) %in% y], length_list, remove_indices_list)
+ rm(remove_indices_list)
+ transcriptome_sort_indices <- lapply(transcriptome_list, order)
+ transcriptome_list <- Map(sort_by_indices, transcriptome_sort_indices, transcriptome_list)
+ length_list <- Map(sort_by_indices, transcriptome_sort_indices, length_list)
+ rm(transcriptome_sort_indices)
+ element_set_groups <- data.table(group_id = group_id_vec, transcriptome_paste = transcriptome_list, transcriptome_N = lengths(transcriptome_list), length_paste = length_list)
+ rm(group_id_vec, transcriptome_list, length_list)
+ 
+ missing_element_set_dt <- list()
+ for(i in 1 : TRANSCRIPTOME_N) {
+  missing_element_sets <- element_set_groups[vapply(transcriptome_paste, function(x) any(transcriptome_names[i] %in% x == F), FUN.VALUE = T), .(group_id, transcriptome_N)]
+  missing_element_sets[, "transcriptome" := transcriptome_names[i]]
+  missing_element_set_dt[[i]] <- missing_element_sets
+  rm(missing_element_sets)
+ }
+ missing_element_set_dt <- rbindlist(missing_element_set_dt)
+ element_set_groups[, c("group_id", "transcriptome_N") := NULL]
+ 
+ element_set_groups[, ':=' ("length_mean" = log10(sapply(length_paste, mean)), "length_prop" = sapply(length_paste, min) / sapply(length_paste, max))]
+ for(i in 1 : TRANSCRIPTOME_N) {
+  element_set_groups[, (transcriptome_names[i]) := fifelse(vapply(transcriptome_paste, function(x) any(transcriptome_names[i] %in% x), FUN.VALUE = T), 1, 0)]
+ }
+ if(TR_NAME_LEN_MAX <= 7) {
+  cols_to_modify <- colnames(element_set_groups) %cin% c("transcriptome_paste", "length_paste", "length_mean", "length_prop") == F
+  colnames(element_set_groups)[cols_to_modify] <- paste0("       ", colnames(element_set_groups)[cols_to_modify])
+ }
+ colnames(element_set_groups)[colnames(element_set_groups) == "length_mean"] <- "len"
+ colnames(element_set_groups)[colnames(element_set_groups) == "length_prop"] <- "min/max(len)"
+ element_set_group_sd <- sapply(element_set_groups[, !c("transcriptome_paste", "length_paste", "len", "min/max(len)")], sd) 
+ if (any(element_set_group_sd != 0))  {
+  element_set_up <-  upset(element_set_groups[, !c("transcriptome_paste", "length_paste")], nsets = TRANSCRIPTOME_N, order.by = "freq", show.numbers = F, set_size.show = F, main.bar.color = UP_COLORS[1], matrix.color = UP_COLORS[2], mb.ratio = c(1, UP_REL_SIZE), boxplot.summary = c("len", "min/max(len)"), text.scale = c(1, 1, 0.8, 0.6, 1, 1))
+  pdf(paste(sub(" ", "_", substr(element_set_cat, 1, nchar(element_set_cat)), fixed = T), "upset_plot.pdf", sep = "_"), onefile = F, height = UP_HEIGHT)
+  print(element_set_up)
+  dev.off()
+ } else {
+  element_set_up <- NULL
+ }
+ 
+ element_set_groups <- element_set_groups[order(-len), .(transcriptome_paste, length_paste)]
+ common_element_sets <- element_set_groups[lengths(transcriptome_paste) == TRANSCRIPTOME_N]
+ if (common_element_sets[, .N] != 0) {
+  common_el_set_lengths <- common_element_sets[, length_paste]
+  common_el_set_transcriptomes <- unlist(common_element_sets[, transcriptome_paste])
+  rm(common_element_sets)
+  common_el_set_length_stats <- analyse_numerical_variable(data.table(transcriptome = common_el_set_transcriptomes, common_el_set_length = unlist(common_el_set_lengths)), "common_el_set_length", paste("Common", element_set_cat, "length"))
+  common_el_set_rel_lengths <- unlist(lapply(common_el_set_lengths, function(x) (x) / max((x))))
+  rm(common_el_set_lengths)
+  common_el_set_rel_lengths <- data.table(transcriptome = common_el_set_transcriptomes, common_el_set_rel_length = common_el_set_rel_lengths)
+  rm(common_el_set_transcriptomes)
+  common_el_set_rel_length_stats <- analyse_categorical_variable(common_el_set_rel_lengths, "common_el_set_rel_length", COMM_EL_SET_REL_BREAKS,  paste("Common", element_set_cat, "relative length"), paste0(toupper(substr(element_set_cat, 1, 1)), substr(element_set_cat, 2, nchar(element_set_cat))))
+  rm(common_el_set_rel_lengths)
+ } else {
+  common_el_set_length_stats <- NULL
+  common_el_set_rel_length_stats <- NULL
+ }
+ 
+ element_set_groups[, "length_transcriptome_paste" := mapply(function(w, t) paste0(w, t), length_paste, transcriptome_paste, SIMPLIFY = F)]
+ element_set_groups[, "length_transcriptome_paste" := sapply(length_transcriptome_paste, paste0, collapse = ",")]
+ element_set_groups[, c("transcriptome_paste", "length_paste") := NULL]
+ for (i in transcriptome_names) {
+  element_set_groups[grepl(paste0(i, ",|", i, "$"), length_transcriptome_paste), (i) := sub(paste0(i, ".*"), "", length_transcriptome_paste)]
+  element_set_groups[grepl(paste0(i, ",|", i, "$"), length_transcriptome_paste), (i) := sub(".*,", "", get(i))]
+ }
+ element_set_groups[, "length_transcriptome_paste" := NULL]
+ element_set_groups[is.na(element_set_groups)] <- 0
+ element_set_groups[, colnames(element_set_groups) := lapply(.SD, as.numeric)]
+ 
+ comp_similarity_dt <- list()
+ for(i in 1 : length(all_trans_pairs)) {
+  first_element <- sub("(.*),pair,.*", "\\1", all_trans_pairs[i])
+  second_element <- sub(".*,pair,(.*)", "\\1", all_trans_pairs[i])
+  comp_similarity <- element_set_groups[, .(get(first_element), get(second_element))]
+  comp_similarity <- comp_similarity[V1 != 0 & V2 != 0]
+  comp_similarity[, "similarity" := V1 / V2]
+  comp_similarity[is.infinite(similarity), "similarity" := 0]
+  comp_similarity[similarity > 1, "similarity" := 1 / similarity]
+  comp_similarity_dt[[i]] <- data.table(transcriptome1 = first_element, transcriptome2 = second_element, similarity = round(comp_similarity[, mean(similarity)], TP_TILE_LABEL_ROUND))
+ }
+ rm(comp_similarity)
+ comp_similarity_dt <- rbindlist(comp_similarity_dt)
+ comp_similarity_dt[, "transcriptome1" := factor(transcriptome1, levels = transcriptome_names)]
+ comp_similarity_dt[, "transcriptome2" := factor(transcriptome2, levels = transcriptome_names)]
+ setorder(comp_similarity_dt, transcriptome1, transcriptome2)
+ write.table(comp_similarity_dt, file = paste(sub(" ", "_", element_set_cat, fixed = T), "pairwise_completeness_similarity_matrix.tsv", sep = "_"))
+ 
+ element_set_tp <- ggplot(comp_similarity_dt, aes(x = transcriptome1, y = transcriptome2, fill = similarity, label = similarity)) +
+  geom_tile(alpha = 0.8) +
+  theme_minimal() +
+  scale_fill_gradientn(colours = TP_COLORS, limits = c(0, 1)) +
+  theme(legend.position = "none") +
+  geom_label(size = TP_TILE_LABEL_SIZE) +
+  xlab("Transcriptome 1") +
+  ylab("Transcriptome 2") + 
+  theme(axis.title = element_blank()) +
+  theme(axis.text.x = element_text(angle = BP_TP_BP3_AXIS_ANGLE, hjust = BP_TP_BP3_AXIS_HJUST, size = TP_LABEL_SIZE)) +
+  theme(axis.text.y = element_text(size = TP_LABEL_SIZE)) +
+  ggtitle(paste0(toupper(substr(element_set_cat, 1, 1)), substr(element_set_cat, 2, nchar(element_set_cat)), " similarity scores")) +
+  theme(plot.title = element_text(size = TP_TITLE_SIZE))
+ ggsave(element_set_tp, filename = paste(paste(sub(" ", "_", element_set_cat, fixed = T), "pairwise_comp_similarity_tileplot", sep = "_"), FIGURE_EXT, sep = "."), height = TP_HEIGHT, width = TP_WIDTH, dpi = FIGURE_DPI) 
+ rm(comp_similarity_dt, element_set_tp)
+ 
+ element_set_groups[, "longest_element" := do.call(pmax, .SD)]
+ element_set_groups <- element_set_groups[, lapply(.SD, function(x) x / longest_element), .SDcols = -"longest_element"]
+ if (TRANSCRIPTOME_N <= 10) {
+  generate_venn_diagram(element_set_groups, paste("pairwise", sub(" ", "_", element_set_cat, fixed = T), "venn_diagrams", sep = "_"))
+ } 
+ rel_el_scores <- round(as.numeric(colMeans(element_set_groups)), 3)
+ if (element_set_groups[, .N] > HP_EL_N) {
+  element_set_groups <- element_set_groups[1 : HP_EL_N] 
+ }
+ element_set_groups <- as.matrix(element_set_groups)
+ element_set_group_sd <- sd(as.numeric(element_set_groups)) 
+ if (element_set_group_sd != 0) {
+  element_set_hp <-  Heatmap(element_set_groups, cluster_rows = T, show_row_dend = F, cluster_columns = T, show_column_dend = T, show_row_names = F, show_column_names = T, column_title  = paste0(toupper(substr(element_set_cat, 1, 1)), substr(element_set_cat, 2, nchar(element_set_cat)), " heatmap"), column_names_rot = 90, column_names_gp = grid::gpar(fontsize = BP_HP_GP_BP3_LABEL_SIZE), col = HP_COLORS, name = "Completeness", use_raster = HP_RASTER)
+  pdf(paste(sub(" ", "_", element_set_cat, fixed = T), "heatmap_plot.pdf", sep = "_"), height = HP_HEIGHT, width = HP_WIDTH)
+  print(element_set_hp)
+  dev.off()
+ } else {
+  element_set_hp <- NULL
+ }
+ 
+ if (element_set_cat == "exon set") {
+  return(list(unique_element_sets, element_set_coords_for_range, missing_element_set_dt, element_set_up, common_el_set_length_stats, common_el_set_rel_length_stats, rel_el_scores, element_set_hp))
+ } else {
+  return(list(unique_element_sets, missing_element_set_dt, element_set_up, common_el_set_length_stats, common_el_set_rel_length_stats, rel_el_scores, element_set_hp))
+ }
+}
+
+#Counting missing element sets (function)
+count_missing_elements <- function(missing_el_sets) {
+ if(missing_el_sets[, .N] != 0) {
+  missing_in_atleast_one <- missing_el_sets[, .N, by = "transcriptome"]  
+  zero_occ_any_missing_el_dt <- data.table(transcriptome = setdiff(transcriptome_names, missing_in_atleast_one[, transcriptome]), N = 0)
+  missing_in_atleast_one <- add_missing_transcriptomes(missing_in_atleast_one, zero_occ_any_missing_el_dt)[, N]
+  missing_in_all <- missing_el_sets[transcriptome_N == TRANSCRIPTOME_N - 1, .N, by = "transcriptome"]
+  rm(missing_el_sets, zero_occ_any_missing_el_dt)
+  if (missing_in_all[, .N] != 0) {
+   zero_occ_all_missing_el_dt <-  data.table(transcriptome = setdiff(transcriptome_names, missing_in_all[, transcriptome]), N = 0)
+   missing_in_all <- add_missing_transcriptomes(missing_in_all, zero_occ_all_missing_el_dt)[, N]
+  } else {
+   missing_in_all <- rep(0, TRANSCRIPTOME_N)
+  }
+ } else {
+  missing_in_atleast_one <- rep(0, TRANSCRIPTOME_N)
+  missing_in_all <- rep(0, TRANSCRIPTOME_N)
+ }
+return(list(missing_in_atleast_one, missing_in_all))
+}
+
+#Annotation-based completeness analysis (function)
+compare_element_set_annot <- function(element_set_cat)  {
+ if (element_set_cat == "exon set") {
+  element_set_gr <- exon_set_gr 
+  gtf_set_gr <- gtf_exon_set_gr
+  el_set_gtf_ovl_min <- MIN_EX_SET_OVL
+  overlap_threshold <- MIN_EX_SET_GTF_SET_OVL_PROP 
+  element_set_size <- exon_set_comp_N
+ } else if (element_set_cat == "transcript set") {
+  element_set_gr <- transcript_set_gr
+  gtf_set_gr <- gtf_transcript_set_gr
+  el_set_gtf_ovl_min <- MIN_TR_SET_OVL
+  overlap_threshold <- MIN_TR_SET_GTF_SET_OVL_PROP 
+  element_set_size <- transcript_set_comp_N
+ }
+  
+ el_set_precision_dt <- list()
+ el_set_ovl_prop_dt <- list()
+ el_set_recall_dt <- list()
+ annot_len_dep_el_scores <- c()
+ gtf_set_ovl_prop_dt <- data.table()
+ for(i in 1 : TRANSCRIPTOME_N) {
+  element_set_gr_trans <- element_set_gr[mcols(element_set_gr)$transcriptome == transcriptome_names[i]]
+  el_set_gtf_set_overlap <- find_overlaps(element_set_gr_trans, gtf_set_gr, -1L, el_set_gtf_ovl_min, F, c("seqnames", "start", "end", "width", "el_set_id"), c("seqnames", "start", "end", "width", "gtf_set_id"), T)[, .(width1, el_set_id1, gtf_set_id2, intersect_width, gtf_set_ovl_prop, el_set_ovl_prop)]
+  if(is.null(el_set_gtf_set_overlap) == F) {
+   setorder(el_set_gtf_set_overlap, -intersect_width)
+   el_set_gtf_set_ovl_gtf_unique <- unique(el_set_gtf_set_overlap, by = "gtf_set_id2")[, .(width1, gtf_set_id2, intersect_width, gtf_set_ovl_prop)]
+   el_set_gtf_set_overlap <- unique(el_set_gtf_set_overlap, by = "el_set_id1")[, .(el_set_id1, el_set_ovl_prop)]
+   el_set_precision_dt[[i]] <- data.table(transcriptome = transcriptome_names[i], N = el_set_gtf_set_overlap[el_set_ovl_prop >= overlap_threshold, .N])
+   el_set_ovl_prop_dt[[i]] <- rbindlist(list(el_set_gtf_set_overlap, data.table(el_set_id1 = mcols(element_set_gr_trans)$el_set_id[mcols(element_set_gr_trans)$el_set_id %in% el_set_gtf_set_overlap[, el_set_id1] == F], el_set_ovl_prop = 0)))
+   rm(element_set_gr_trans, el_set_gtf_set_overlap)
+   el_set_ovl_prop_dt[[i]][, "transcriptome" := transcriptome_names[i]]
+   el_set_recall_dt[[i]] <- data.table(transcriptome = transcriptome_names[i], N = el_set_gtf_set_ovl_gtf_unique[gtf_set_ovl_prop >= overlap_threshold, .N])
+   gtf_set_ids <- data.table(gtf_set_id2 = mcols(gtf_set_gr)$gtf_set_id)
+   if (TRANSCRIPTOME_N > 1) {
+    gtf_set_ovl_prop <- el_set_gtf_set_ovl_gtf_unique[, .(gtf_set_id2, width1, gtf_set_ovl_prop)][gtf_set_ids, on = "gtf_set_id2"]
+    gtf_set_ovl_prop[, "gtf_set_id2" := NULL]
+    colnames(gtf_set_ovl_prop) <- c(paste(transcriptome_names[i], "el_set_length", sep = "_"), paste(transcriptome_names[i], "gtf_set_prop", sep = "_"))
+   } else {
+    gtf_set_ovl_prop <- el_set_gtf_set_ovl_gtf_unique[, .(gtf_set_id2, gtf_set_ovl_prop)][gtf_set_ids, on = "gtf_set_id2"]
+    gtf_set_ovl_prop[, "gtf_set_id2" := NULL]
+    colnames(gtf_set_ovl_prop) <- paste(transcriptome_names[i], "gtf_set_prop", sep = "_")
+   }
+   rm(el_set_gtf_set_ovl_gtf_unique, gtf_set_ids)
+  } else {
+   if (TRANSCRIPTOME_N > 1) {
+    rm(el_set_gtf_set_overlap)
+    el_set_precision_dt[[i]] <-  data.table(transcriptome = transcriptome_names[i], N = 0)
+    el_set_ovl_prop_dt[[i]] <- data.table(el_set_id1 = mcols(element_set_gr_trans)$el_set_id, el_set_ovl_prop = 0, transcriptome = transcriptome_names[i])
+    rm(element_set_gr_trans)
+    el_set_recall_dt[[i]] <- data.table(transcriptome = transcriptome_names[i], N = 0)
+    gtf_set_ovl_prop <- data.table(el_set_length = NA, gtf_set_prop = NA)
+    colnames(gtf_set_ovl_prop) <- c(paste(transcriptome_names[i], "el_set_length", sep = "_"), paste(transcriptome_names[i], "gtf_set_prop", sep = "_"))
+   } else {
+    return(NULL)
+   }
+  }
+  gtf_set_ovl_prop_dt <- cbind(gtf_set_ovl_prop_dt, gtf_set_ovl_prop)
+  rm(gtf_set_ovl_prop)
+ }
+ rm(element_set_gr)
+ 
+ el_set_precision_dt <- rbindlist(el_set_precision_dt)
+ if(el_set_precision_dt[, sum(N)] == 0) {
+  return(NULL)
+ }
+ el_set_ovl_prop_dt <- rbindlist(el_set_ovl_prop_dt) 
+ el_set_recall_dt <- rbindlist(el_set_recall_dt)
+ el_set_precision_dt <- calculate_proportions(el_set_precision_dt, element_set_size)
+ el_set_ovl_prop_stats <- analyse_categorical_variable(el_set_ovl_prop_dt, "el_set_ovl_prop", EL_SET_GTF_SET_OVL_PROP_BREAKS, paste("Prop of", element_set_cat, "covered by a GTF set", sep = " "), paste0(toupper(substr(element_set_cat, 1, 1)), substr(element_set_cat, 2, nchar(element_set_cat))))
+ rm(el_set_ovl_prop_dt)
+ el_set_recall_dt <- el_set_recall_dt[, paste0(N, ", ", round(100 * N / length(gtf_set_gr), 2), "%")]
+ gtf_set_ids <- mcols(gtf_set_gr)$gtf_set_id
+ rm(gtf_set_gr)
+ 
+ if (TRANSCRIPTOME_N > 1) {
+  el_set_length_mean <- log10(rowMeans(gtf_set_ovl_prop_dt[, .SD, .SDcols = paste(transcriptome_names, "el_set_length", sep = "_")], na.rm = T))
+  cols_to_keep <- paste(transcriptome_names, "gtf_set_prop", sep = "_")
+  gtf_set_ovl_prop_dt <- gtf_set_ovl_prop_dt[, ..cols_to_keep]
+  rm(cols_to_keep)
+ }
+ gtf_set_ovl_prop_dt[is.na(gtf_set_ovl_prop_dt)] <- 0
+ setnames(gtf_set_ovl_prop_dt, transcriptome_names)
+ write.table(cbind(gtf_set_ids, gtf_set_ovl_prop_dt), file = paste(sub(" ", "_", element_set_cat, fixed = T), "annotation_based_matrix.tsv", sep = "_"), sep = "\t", row.names = F, col.names = T, quote = F)  
+ rm(gtf_set_ids)
+ annot_el_scores <- round(as.numeric(colMeans(gtf_set_ovl_prop_dt)), 3)
+ 
+ if (TRANSCRIPTOME_N > 1) {
+  if (TRANSCRIPTOME_N  <= 10) {
+   generate_venn_diagram(gtf_set_ovl_prop_dt, paste("annotation_based_pairwise", sub(" ", "_", element_set_cat, fixed = T), "venn_diagrams", sep = "_"))
+  } 
+  if (gtf_set_ovl_prop_dt[, .N] > HP_EL_N) {
+   gtf_set_ovl_prop_matrix_hp <- as.matrix(gtf_set_ovl_prop_dt[1 : HP_EL_N])
+  } else {
+   gtf_set_ovl_prop_matrix_hp <- as.matrix(gtf_set_ovl_prop_dt)
+  }
+  gtf_set_ovl_prop_matrix_hp_sd <- sd(as.numeric(gtf_set_ovl_prop_matrix_hp)) 
+  if (gtf_set_ovl_prop_matrix_hp_sd != 0) {
+   element_set_annot_hp <- Heatmap(gtf_set_ovl_prop_matrix_hp, cluster_rows = T, show_row_dend = F, cluster_columns = T, show_column_dend = T, show_row_names = F, show_column_names = T , column_title = paste("Annotation-based", element_set_cat, "heatmap", sep = " "), column_names_rot = 90, column_names_gp = grid::gpar(fontsize = BP_HP_GP_BP3_LABEL_SIZE), col = HP_COLORS, name = "Completeness", use_raster = HP_RASTER)
+   pdf(paste("annotation-based", sub(" ", "_", element_set_cat, fixed = T), "heatmap_plot.pdf", sep = "_"), height = HP_HEIGHT, width = HP_WIDTH)
+   draw(element_set_annot_hp)
+   dev.off()
+  } else {
+   element_set_annot_hp <- NULL  
+  }
+  rm(gtf_set_ovl_prop_matrix_hp)
+  
+  gtf_set_ovl_prop_dt <- cbind(gtf_set_ovl_prop_dt, el_set_length_mean) 
+  rm(el_set_length_mean)
+  gtf_set_ovl_prop_dt <- gtf_set_ovl_prop_dt[is.nan(el_set_length_mean) == F]
+  gtf_set_ovl_prop_dt[, "gtf_set_ovl_prop_mean" := rowMeans(.SD, na.rm =  T), .SDcols = transcriptome_names]
+  gtf_set_ovl_prop_dt[, (transcriptome_names) := lapply(.SD, function(x) { fifelse(x == 0, 0, 1)}), .SDcols = transcriptome_names]
+  if(TR_NAME_LEN_MAX <= 7) {
+   cols_to_modify <- colnames(gtf_set_ovl_prop_dt) %chin% c("el_set_length_mean", "gtf_set_ovl_prop_mean") == F
+   colnames(gtf_set_ovl_prop_dt)[cols_to_modify] <- paste0("       ", colnames(gtf_set_ovl_prop_dt)[cols_to_modify])
+  }
+  colnames(gtf_set_ovl_prop_dt)[colnames(gtf_set_ovl_prop_dt) == "el_set_length_mean"] <- "len"
+  colnames(gtf_set_ovl_prop_dt)[colnames(gtf_set_ovl_prop_dt) == "gtf_set_ovl_prop_mean"] <- "GTF_prop"
+  gtf_set_ovl_prop_dt_sd <- sapply(gtf_set_ovl_prop_dt[, !c("len", "GTF_prop")], sd)
+  if(any(gtf_set_ovl_prop_dt_sd != 0)) {
+   element_set_annot_up <- upset(gtf_set_ovl_prop_dt, nsets = TRANSCRIPTOME_N, order.by = "freq", show.numbers = F, set_size.show = F, main.bar.color = UP_COLORS[1], matrix.color = UP_COLORS[2], mb.ratio = c(1, UP_REL_SIZE), boxplot.summary = c("len", "GTF_prop"), text.scale =  c(1, 1, 0.8, 0.6, 1, 1)) 
+   pdf(paste("annotation-based", sub(" ", "_", element_set_cat, fixed = T), "upset_plot.pdf", sep = "_"), onefile = F, height = UP_HEIGHT)
+   print(element_set_annot_up)
+   dev.off()
+  } else {
+   element_set_annot_up <- NULL
+  }
+ } else {
+  element_set_annot_hp <- NULL
+  element_set_annot_up <- NULL
+ }
+ 
+ return(list(el_set_precision_dt, el_set_recall_dt, el_set_ovl_prop_stats, annot_el_scores, element_set_annot_up, element_set_annot_hp))
+}
+```
+
+
+### Outline
+
+This HTML document contains the output of CATS-rb transcriptome assembly comparison tool. For more details on each table and figure, refer to the tool's documentation. In order to customize different plotting parameters, refer to the tool's documentation.
+<br>
+<br>
+
+### General transcriptome assembly statistics
+
+```{r echo=F, message=F, warning=F}
+#Importing exon mappings from files
+exon_mappings <- import_data("mapped.tsv", "exon_mappings")
+exon_mappings <- process_filenames(exon_mappings, "_mapped.tsv")
+setnames(exon_mappings, c("tr_name", "scaff_name", "exon_identity", "exon_tr_start", "exon_tr_end", "exon_scaff_start", "exon_scaff_end", "transcriptome")) 
+
+#Adjusting transcriptome assembly name levels
+transcriptome_names <- unique(exon_mappings[, transcriptome])
+exon_mappings[, "transcriptome" := factor(transcriptome, levels = transcriptome_names)]
+
+#Adjusting transcript names
+exon_mappings[, "tr_name" := paste(transcriptome, tr_name, sep = ",trs,")]
+
+#Calculating the number of transcriptome assemblies and the maximum assembly name length
+TRANSCRIPTOME_N <- length(transcriptome_names)
+TR_NAME_LEN_MAX <- max(nchar(transcriptome_names))
+
+#Retrieving transcriptome assembly name pairs
+if (TRANSCRIPTOME_N > 1) {
+ all_trans_pairs <- as.data.table(t(combn(transcriptome_names, 2)))
+ all_trans_pairs <- all_trans_pairs[, paste(V1, V2, sep = ",pair,")]
+}
+
+#Setting kable and plotting arguments
+KABLE_PER_CHUNK_COL_N <- c(9, 8, 7)[findInterval(TR_NAME_LEN_MAX, c(0, 10, 15, Inf))]
+if (TRANSCRIPTOME_N > length(RP_COLORS)) {
+ RP_COLORS <- colorRampPalette(RP_COLORS)(TRANSCRIPTOME_N)
+}
+RP_HEIGHT <- c(4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18)[findInterval(TRANSCRIPTOME_N, c(0, 6, 11, 18, 26, 31, 41, 51, 60, 65, 70, 88, 95, 101, 105, Inf))]
+RP_WIDTH <- RP_HEIGHT + 2
+BP_BP3_BAR_WIDTH <- c(0.25, 0.4, 0.75, 0.8, 0.85)[findInterval(TRANSCRIPTOME_N, c(0, 2, 4, 7, 9, Inf))]
+BP_TP_BP3_AXIS_ANGLE <- fifelse(TRANSCRIPTOME_N <= 4, 0, 45)
+BP_TP_BP3_AXIS_HJUST <- fifelse(BP_TP_BP3_AXIS_ANGLE == 0, 0.5, 0.9)
+BP_HP_GP_BP3_LABEL_SIZE <- c(8, 7.5, 7)[findInterval(TR_NAME_LEN_MAX, c(0, 10, 15, Inf))]
+BP_BP3_WIDTH <- c(7, 8, 8.5, 9, 9.5, 10, 10.5, 11, 11.5)[findInterval(TRANSCRIPTOME_N, c(0, 16, 21, 26, 36, 61, 81, 93, 105, Inf))]
+WD_TR_LABEL_SIZE <- c(2.2, 2, 1.6, 1.4)[findInterval(TR_NAME_LEN_MAX, c(0, 5, 8, 15, Inf))]
+WD_N_LABEL_SIZE <- c(2.5, 2.3)[findInterval(TRANSCRIPTOME_N, c(0, 6, 11))]
+WD_ROW_N <- fifelse(TRANSCRIPTOME_N <= 3, 1, ceiling(TRANSCRIPTOME_N / 3) + 1)
+WD_HEIGHT_WIDTH <- fifelse(TRANSCRIPTOME_N <= 2, 2, TRANSCRIPTOME_N + 3)
+UP_REL_SIZE <- c(1, 1.5, 1.8)[findInterval(TRANSCRIPTOME_N, c(0, 41, 71, Inf))]
+UP_HEIGHT <- c(6, 8, 11, 12, 13, 14, 15, 16, 17, 18)[findInterval(TRANSCRIPTOME_N, c(0, 6, 17, 31, 41, 51, 61, 71, 91, 101, Inf))]
+TP_TILE_LABEL_ROUND <- c(2, 1)[findInterval(TRANSCRIPTOME_N, c(0, 51, Inf))]
+TP_TILE_LABEL_SIZE <- c(4.5, 4, 3.3, 2.3, 2)[findInterval(TRANSCRIPTOME_N, c(0, 21, 41, 81, 93, Inf))]
+TP_LABEL_SIZE <- c(9, 8, 7)[findInterval(TR_NAME_LEN_MAX, c(0, 15, 22, Inf))]
+TP_TITLE_SIZE <- TP_LABEL_SIZE + 3
+TP_HEIGHT <- c(2, 3.5, 7.5, 9.5, 12, 15, 16, 17, 18, 19, 20)[findInterval(TRANSCRIPTOME_N, c(0, 4, 6, 11, 18, 24, 31, 41, 51, 71, 101, Inf))]
+TP_WIDTH <- TP_HEIGHT + 1
+HP_HEIGHT <- c(5, 6, 7, 8, 9, 10, 11, 12, 13, 14)[findInterval(HP_EL_N, c(0, 6500, 13000, 19500, 26000, 32500, 39000, 45500, 52000, 58500, 65000))]
+HP_WIDTH <- c(6, 7, 8, 9, 10, 11, 12)[findInterval(TRANSCRIPTOME_N, c(0, 21, 41, 61, 71, 81, 91, Inf))]
+if (TRANSCRIPTOME_N > length(GP_COLORS)) {
+ GP_COLORS <- colorRampPalette(GP_COLORS)(TRANSCRIPTOME_N)
+}
+GP_HEIGHT <- c(6.5, 8, 10, 11, 13, 14, 15)[findInterval(TRANSCRIPTOME_N, c(0, 6, 16, 21, 31, 41, 60, Inf))]
+BP2_LABEL_SIZE <- c(9, 8, 7)[findInterval(TR_NAME_LEN_MAX, c(0, 10, 15, Inf))]
+BP2_LABEL2_SIZE <- BP2_LABEL_SIZE - 3.5
+BP2_HEIGHT <- c(5.5, 7, 10, 11, 12, 13, 14, 16, 17, 19, 20, 21, 22, 23)[findInterval(TRANSCRIPTOME_N, c(0, 6, 17, 21, 31, 36, 50, 60, 65, 70, 78, 82, 94, 100, Inf))]
+BP2_WIDTH <- BP2_HEIGHT + 2
+
+#Importing general transcriptome assembly statistics from files
+general_trans_stats <- import_data("general_statistics_table.tsv", "general_statistics")
+colnames(general_trans_stats) <- c("Parameter", transcriptome_names)
+
+#Writing full transcriptome assembly statistics to file
+write.table(general_trans_stats, file = "CATS_rb_general_statistics.tsv", sep = "\t", row.names = F, col.names = T, quote = F)
+```
+
+**Table 1.** General transcriptome assembly statistics.
+
+```{r echo=F, message=F, warning=F, fig.align='center', results="asis"}
+#Displaying the general transcriptome assembly statistics kable
+display_kable(general_trans_stats)
+rm(general_trans_stats)
+```
+IQR = interquartile range
+<br>
+<br>
+
+```{r echo=F, message=F, warning=F}
+#Importing transcript lengths from files
+invisible(gc(full = T))
+tr_lengths <- import_data("lengths.tsv", "tr_lengths")
+tr_lengths <- process_filenames(tr_lengths, "_lengths.tsv")
+setnames(tr_lengths, c("tr_name", "tr_len", "transcriptome"))
+tr_lengths[, "transcriptome" := factor(transcriptome, levels = transcriptome_names)]
+
+#Calculating the number of transcripts per transcriptome assembly
+transcriptome_N <- tr_lengths[, .N, by = "transcriptome"]
+
+#Adjusting transcript names
+tr_lengths[, "tr_name" := paste(transcriptome, tr_name, sep = ",trs,")]
+
+#Plotting transcript length
+analyse_numerical_variable(tr_lengths, "tr_len", "Transcript length")
+
+#Determining unmapped transcripts
+unmapped_tr <- tr_lengths[tr_name %chin% unique(exon_mappings[, tr_name]) == F, .(tr_name, transcriptome)]
+tr_lengths[, "transcriptome" := NULL]
+
+#Writing unmapped transcripts to file
+if (unmapped_tr[, .N] != 0) {
+ unmapped_tr[, "tr_name" := sub(".*,trs,", "", tr_name)]
+ unmapped_tr[, "transcriptome" := factor(transcriptome, levels = transcriptome_names)]
+ setorder(unmapped_tr, transcriptome, tr_name)
+}
+write.table(unmapped_tr, file = "unmapped_transcripts.tsv", sep = "\t", row.names =  F, col.names = T, quote = F)
+
+#Calculating the number of unmapped transcripts per transcriptome assembly
+unmapped_tr_N <- unmapped_tr[, .N, by = "transcriptome"]
+transcriptome_map_stats  <- calculate_proportions(unmapped_tr_N, transcriptome_N)
+rm(unmapped_tr_N)
+
+#Filtering exon mappings by identity
+exon_mappings[, "exon_identity" := exon_identity / 100]
+exon_mappings <- exon_mappings[exon_identity >= MIN_EX_ID_PROP]
+if (exon_mappings[, .N] == 0) {
+ print("None of the exons remained after identity filtering. Exiting")
+ knit_exit()
+}
+
+#Denoting strands
+exon_mappings[, "scaff_strand" := fifelse(exon_scaff_end > exon_scaff_start, "+", "-")]
+exon_mappings[, "scaff_name" := paste0(scaff_name, scaff_strand)] 
+exon_mappings[scaff_strand == "-", ':=' ("exon_scaff_end" = exon_scaff_start, "exon_scaff_start" = exon_scaff_end)]
+exon_mappings[, "scaff_strand" := NULL]
+
+#Sorting the exon table to account for strandness
+exon_mappings <- exon_mappings[order(c(scaff_name, .I))]
+
+#Filtering exon mappings by length
+exon_mappings <- exon_mappings[exon_scaff_end - exon_scaff_start + 1 >= MIN_EX_LEN]
+if (exon_mappings[, .N] == 0) {
+ print("None of the exons remained after length filtering. Exiting")
+ knit_exit()
+}
+
+#Adjusting reverse transcript mappings
+exon_mappings[, "rev_status" := fifelse(exon_tr_end < exon_tr_start, T, F)]
+if (STRANDED == F) {
+ exon_mappings[rev_status == T, ':=' ("exon_tr_start" = exon_tr_end, "exon_tr_end" = exon_tr_start)]
+ exon_mappings <- rbindlist(list(exon_mappings[rev_status == F], exon_mappings[rev_status == T][.N : 1]))
+} else {
+ exon_mappings <- exon_mappings[rev_status==F]
+}
+exon_mappings[, "rev_status" := NULL]
+
+#Defining transcript mappings - separating multiple mappings of the same transcript
+exon_mappings[, "exon_tr_lag_dist" := exon_tr_start - data.table::shift(exon_tr_end, n = 1, fill = NA, type = "lag"), by = c("tr_name", "scaff_name")]
+exon_mappings[, "exon_tr_lag_len" := data.table::shift(exon_tr_end - exon_tr_start + 1, n = 1, fill = NA, type = "lag"), by = c("tr_name", "scaff_name")]
+exon_mappings[, "exon_scaff_lag_dist" := exon_scaff_start - data.table::shift(exon_scaff_end, n = 1, fill = NA, type = "lag"), by = c("tr_name", "scaff_name")]
+exon_mappings[, "row_N" := .I]
+tr_mapping_boundaries <- data.table(tr_name = NA, scaff_name = NA, exon_identity = NA, exon_tr_start = NA, exon_tr_end = NA, exon_scaff_start = NA, exon_scaff_end = NA, transcriptome = NA, row_N = exon_mappings[is.na(exon_tr_lag_dist) | exon_tr_lag_dist < -0.5 * exon_tr_lag_len | abs(exon_scaff_lag_dist) > MAX_INT_LEN, row_N])
+exon_mappings[, c("exon_tr_lag_dist", "exon_tr_lag_len", "exon_scaff_lag_dist") := NULL]
+exon_mappings <- rbindlist(list(tr_mapping_boundaries, exon_mappings), fill = T)
+rm(tr_mapping_boundaries)
+setorder(exon_mappings, row_N)
+exon_mappings[, "row_N" := NULL]
+exon_mappings[, "map_N" := rleid(tr_name)]
+exon_mappings <- exon_mappings[is.na(transcriptome) == F]
+exon_mappings[, "map_N" := rleid(map_N), by = "tr_name"]
+exon_mappings[, "tr_name" := paste(tr_name, map_N, sep = "_mapid")]
+exon_mappings[, "map_N" := NULL]
+
+#Defining transcript mapping coordinates
+transcripts <- exon_mappings[, .(scaff_start =  min(exon_scaff_start), scaff_end = max(exon_scaff_end)), by = c("tr_name", "scaff_name")]
+if (STRANDED == F) {
+ exon_mappings[, "scaff_name" := sub(".$", "", scaff_name)]
+}
+transcripts <- exon_mappings[, .(tr_start = min(exon_tr_start), tr_end = max(exon_tr_end)), by = "tr_name"][transcripts, on = "tr_name"]
+
+#Calculating mean exon identity proportion per transcript
+exon_identity_mean <- exon_mappings[, .(id_mean = mean(exon_identity)), by = "tr_name"]
+exon_mappings[, "exon_identity" := NULL]
+transcripts <- exon_identity_mean[transcripts, on = "tr_name"]
+rm(exon_identity_mean)
+
+#Calculating transcript alignment length
+reduced_exons <- as.data.table(reduce(makeGRangesFromDataFrame(exon_mappings, seqnames.field = "tr_name", start.field = "exon_tr_start", end.field = "exon_tr_end", keep.extra.columns = F), ignore.strand = T, min.gapwidth = 0))
+total_tr_al_len <- setnames(reduced_exons[, sum(width), by = "seqnames"], c("tr_name", "aln_len"))
+transcripts <- total_tr_al_len[transcripts, on = "tr_name"]
+rm(reduced_exons, total_tr_al_len)
+
+#Extracting transcript mapping number
+transcripts[, "map_N" := as.numeric(sub(".*_mapid", "", tr_name))]
+transcripts[, "tr_name_map_N" := tr_name]
+transcripts[, "tr_name" := sub("_mapid.*", "", tr_name)]
+
+#Adding transcript lengths
+transcripts <- tr_lengths[transcripts, on = "tr_name"]
+rm(tr_lengths)
+
+#Calculating transcript alignment proportion
+transcripts[, "aln_prop" := aln_len / tr_len]
+transcripts[, c("aln_len", "tr_len") := NULL]
+
+#Determining the best mapping per transcript, filtering exon mappings
+transcripts[, "aln_prop_id_mean" := round(aln_prop * id_mean, 2)]
+transcripts[, "id_mean" := NULL]
+setorder(transcripts, -aln_prop_id_mean, scaff_name, scaff_start, -scaff_end)
+transcripts[, "aln_prop_id_mean" := NULL]
+best_mapping_tr_name <- transcripts[, .SD[1], by = "tr_name"][, tr_name_map_N]
+exon_mappings <- exon_mappings[tr_name %chin% best_mapping_tr_name]
+exon_mappings[, "tr_name" := sub("_mapid.*", "", tr_name)]
+
+#Plotting transcript alignment proportion
+transcripts[, "transcriptome" := sub(",trs,.*", "", tr_name)]
+best_mapping_tr_aln_prop <- transcripts[tr_name_map_N %chin% best_mapping_tr_name, .(tr_name, transcriptome, aln_prop)]
+transcripts[, c("tr_name_map_N", "aln_prop") := NULL]
+aln_prop_stats <- analyse_categorical_variable(best_mapping_tr_aln_prop, "aln_prop", TR_ALN_PROP_BREAKS, "Transcript alignment proportion", "Transcript")
+transcriptome_map_stats <- rbindlist(list(transcriptome_map_stats, aln_prop_stats))
+rm(aln_prop_stats)
+
+#Writing transcript alignment proportion to file
+best_mapping_tr_aln_prop[, "tr_name" := sub(".*,trs,", "", tr_name)]
+best_mapping_tr_aln_prop[, "transcriptome" := factor(transcriptome, levels = transcriptome_names)]
+setorder(best_mapping_tr_aln_prop, transcriptome, tr_name)
+write.table(best_mapping_tr_aln_prop, file = "transcript_aln_prop.tsv", sep = "\t", row.names = F, col.names = T, quote = F)
+
+#Structural inconsistency analysis - transcripts with low alignment proportion
+str_inc_aln_prop_tr <- best_mapping_tr_aln_prop[aln_prop <= STR_INC_ALN_PROP, .(tr_name, transcriptome)]
+
+#Writing transcripts with low alignment proportion to file
+if (str_inc_aln_prop_tr[, .N] != 0) {
+ str_inc_aln_prop_tr[, "transcriptome" := factor(transcriptome, levels = transcriptome_names)]
+ setorder(str_inc_aln_prop_tr, transcriptome, tr_name)
+}
+write.table(str_inc_aln_prop_tr, file = "transcripts_low_aln_prop.tsv", sep = "\t", row.names = F, col.names = T, quote = F)
+ 
+#Calculating the number of multimapped transcripts per transcriptome assembly
+multimap_tr_N <- transcripts[map_N != 1, .N, by = c("transcriptome", "tr_name")][, .N, by = "transcriptome"]
+multimap_tr_N <- calculate_proportions(multimap_tr_N, transcriptome_N)
+transcriptome_map_stats <- rbindlist(list(transcriptome_map_stats, multimap_tr_N))
+rm(multimap_tr_N)
+
+#Writing the number of mappings per transcript to file
+tr_map_N <- unique(transcripts[, .(tr_name, transcriptome, map_N)][order(-map_N)], by = "tr_name")
+transcripts[, "transcriptome" := NULL]
+tr_map_N[, "tr_name" := sub(".*,trs,", "", tr_name)]
+tr_map_N[, "transcriptome" := factor(transcriptome, levels = transcriptome_names)]
+setorder(tr_map_N, transcriptome, tr_name)
+write.table(tr_map_N, file = "transcript_mapped_N.tsv", sep = "\t", row.names = F, col.names = T, quote = F)
+rm(tr_map_N)
+
+#Structural inconsistency analysis - transcript segments mapping to different genomic regions
+if (transcripts[map_N != 1, .N] != 0) {
+ multimapped_tr <- transcripts[tr_name %chin% unique(transcripts[map_N > 1, tr_name]) & tr_name !="SRR33339778_IDB,trs,contig-60_0"]
+ multimapped_tr_gr <- makeGRangesFromDataFrame(multimapped_tr, seqnames.field  = "tr_name", start.field = "tr_start", end.field = "tr_end", ignore.strand = T, keep.extra.columns = T)
+ multimapped_tr_gr_nearest_k <- nearestKNeighbors(multimapped_tr_gr, k = max(multimapped_tr[, map_N]) - 1, ignore.strand = T)
+ rm(multimapped_tr_gr)
+ multimapped_tr[, "map_N" := NULL]
+ multimapped_tr_tmp <- multimapped_tr[rep(1 : multimapped_tr[, .N], elementNROWS(multimapped_tr_gr_nearest_k))]
+ multimapped_tr_nearest <- multimapped_tr[unlist(multimapped_tr_gr_nearest_k)]
+ rm(multimapped_tr_gr_nearest_k)
+ multimapped_trans_with_nearest <- cbind(multimapped_tr_tmp, multimapped_tr_nearest)
+ rm(multimapped_tr_tmp, multimapped_tr_nearest)
+ setnames(multimapped_trans_with_nearest, c("seqnames1", "start1", "end1", "scaff_name1", "scaff_start1", "scaff_end1", "seqnames2","start2", "end2", "scaff_name2", "scaff_start2", "scaff_end2"))
+ multimapped_trans_with_nearest <- multimapped_trans_with_nearest[seqnames1 == seqnames2 & start1 != start2]
+ 
+ if (multimapped_trans_with_nearest[, .N] != 0) {
+  multimapped_trans_with_nearest[, "seqnames2" := NULL]
+  multimapped_trans_with_nearest[, ':=' ("width1" = end1 - start1 + 1, "width2" = end2 - start2 + 1)]
+  multimapped_trans_with_nearest[, "map_distance" := fifelse(start1 < start2, end1 - start2 + 1, end2 - start1 + 1)]
+  multimapped_trans_with_nearest[, c("start1", "start2", "end1", "end2") := NULL]
+  multimapped_trans_with_nearest[, "map_distance_rel1" := map_distance / width1]
+  multimapped_trans_with_nearest[, "map_distance_rel2" := map_distance / width2]
+  multimapped_trans_with_nearest[, c("map_distance", "width1", "width2") := NULL]
+  str_inc_gen_pos_tr <- unique(multimapped_trans_with_nearest[map_distance_rel1 <= STR_INC_MAX_OVL_PROP & map_distance_rel2 <= STR_INC_MAX_OVL_PROP & (scaff_name1 != scaff_name2 | (scaff_start1 < scaff_start2 & scaff_start2 - scaff_end1 + 1 > MAX_INT_LEN) | (scaff_start1 > scaff_start2 & scaff_start1 - scaff_end2 + 1 > MAX_INT_LEN)), .(seqnames1)])
+  rm(multimapped_trans_with_nearest)
+  
+  if (str_inc_gen_pos_tr[, .N] != 0) {
+   str_inc_gen_pos_tr_coords <- transcripts[tr_name %chin% str_inc_gen_pos_tr[, seqnames1], .(tr_name, tr_start, tr_end)]
+   transcripts[, c("tr_start", "tr_end") := NULL]
+   str_inc_gen_pos_tr_coords[, "tr_len" := tr_end - tr_start + 1]
+   str_inc_gen_pos_tr_coords[, "remove_candidate" := fifelse(tr_start - min(tr_start) <= 0.1 * max(tr_len) & max(tr_end) - tr_end <= 0.1 * max(tr_len), T, F), by = "tr_name"]
+   str_inc_gen_pos_tr <-  str_inc_gen_pos_tr[seqnames1 %chin% str_inc_gen_pos_tr_coords[remove_candidate == T, tr_name] == F]
+   rm(str_inc_gen_pos_tr_coords)
+   if(str_inc_gen_pos_tr[, .N] != 0) {
+    str_inc_gen_pos_tr[, "transcriptome" := sub(",trs,.*", "", seqnames1)]
+    str_inc_gen_pos_tr[, "seqnames1" := sub(".*,trs,", "", seqnames1)]
+    colnames(str_inc_gen_pos_tr)[1] <- "tr_name"
+    str_inc_gen_pos_tr[, "transcriptome" := factor(transcriptome, levels = transcriptome_names)]
+    setorder(str_inc_gen_pos_tr, transcriptome, tr_name)
+   }
+  } else {
+   transcripts[, c("tr_start", "tr_end") := NULL]
+  }
+ } else {
+  rm(multimapped_trans_with_nearest)
+  transcripts[, c("tr_start", "tr_end") := NULL]
+  str_inc_gen_pos_tr <- data.table()
+ }
+} else {
+ transcripts[, c("tr_start", "tr_end") := NULL]
+ str_inc_gen_pos_tr <- data.table()
+}
+if(STRANDED == F) {
+ transcripts[, "scaff_name" := sub(".$", "", scaff_name)]
+}
+
+#Writing transcripts whose segments map to different genomic regions to file
+write.table(str_inc_gen_pos_tr, file = "transcripts_diff_genomic_region.tsv", sep = "\t", row.names = F, col.names = T, quote = F)
+
+#Merging structurally inconsistent transcripts
+str_inc_tr <- unique(rbindlist(list(unmapped_tr, str_inc_aln_prop_tr, str_inc_gen_pos_tr)))
+rm(unmapped_tr, str_inc_aln_prop_tr, str_inc_gen_pos_tr)
+if(length(str_inc_tr) != 0) {
+ str_inc_tr[, "transcriptome" := factor(transcriptome, levels = transcriptome_names)]
+ setorder(str_inc_tr, transcriptome, tr_name)
+ str_inc_tr_N <-  str_inc_tr[, .N, by = "transcriptome"]
+} else {
+ str_inc_tr_N <- data.table(N = 0, transcriptome = transcriptome_names)
+}
+
+#Writing structurally inconsistent transcripts to file
+write.table(str_inc_tr, file = "str_inconsistent_transcripts.tsv", sep = "\t", row.names = F, col.names = T, quote = F)
+rm(str_inc_tr)
+str_inc_tr_N <- calculate_proportions(str_inc_tr_N, transcriptome_N)
+transcriptome_map_stats <- rbindlist(list(transcriptome_map_stats, str_inc_tr_N))
+rm(str_inc_tr_N)
+ 
+#Filtering transcripts by the best mapping
+transcripts[, "tr_name" := paste(tr_name, map_N, sep = "_mapid")]
+transcripts[, "map_N" := NULL]
+transcripts <- transcripts[tr_name %chin% best_mapping_tr_name]
+rm(best_mapping_tr_name)
+
+#Calculating the number of exons per transcriptome assembly
+exon_mapping_N <- exon_mappings[, .N, by = "transcriptome"][, N]
+transcriptome_map_stats <- rbindlist(list(transcriptome_map_stats, as.list(exon_mapping_N)))
+rm(exon_mapping_N)
+
+#Calculating and plotting the number of exons per transcript
+per_tr_exon_N <- exon_mappings[, .(exon_N = .N), by = c("tr_name", "transcriptome")]
+exon_N_stats <- analyse_categorical_variable(per_tr_exon_N, "exon_N", EXON_PER_TR_N_BREAKS, "Number of exons per transcript", "Exon")
+per_tr_exon_N[, "per_tr_exon_N_cat" := NULL]
+transcriptome_map_stats <- rbindlist(list(transcriptome_map_stats, exon_N_stats))
+rm(exon_N_stats)
+
+#Writing exon number per transcript to file
+per_tr_exon_N[, "tr_name" := sub(".*,trs,", "", tr_name)]
+per_tr_exon_N[, "transcriptome" := factor(transcriptome, levels = transcriptome_names)]
+setorder(per_tr_exon_N, transcriptome, tr_name)
+write.table(per_tr_exon_N, file = "per_transcript_exon_n.tsv", sep = "\t", row.names = F, col.names = T, quote = F)
+rm(per_tr_exon_N)
+
+#Calculating and plotting exon length
+exon_mappings[, "exon_len" := exon_scaff_end - exon_scaff_start + 1]
+exon_len_stats <- analyse_numerical_variable(exon_mappings, "exon_len", "Exon length")
+exon_mappings[, "exon_len" := NULL]                               
+transcriptome_map_stats <- rbindlist(list(transcriptome_map_stats, exon_len_stats))
+rm(exon_len_stats)
+
+#Generating transcriptome assembly mapping statistics
+transcriptome_map_stat_params <- data.table(c("N, % unmapped transcripts", "Transcript alignment proportion (mean, IQR)", "N, % multimapped transcripts", "N, % structural inconsistent transcripts", "N exons", "N exons per transcript (mean, IQR)", "Exon length (bp) (mean, IQR)"))
+transcriptome_map_stats <- cbind(transcriptome_map_stat_params, transcriptome_map_stats)
+rm(transcriptome_map_stat_params)
+colnames(transcriptome_map_stats) <- c("Parameter", transcriptome_names)
+```
+
+
+```{r echo=F, message=F, warning=F, fig.align='center', fig.height=`RP_HEIGHT`, fig.width=`RP_WIDTH`}
+#Displaying the transcript length raincloud plot
+knitr::include_graphics(paste("transcript_length", FIGURE_EXT, sep = "."))
+```
+**Figure 1.** Transcript length distribution.
+<br>
+<br>
+
+### Transcriptome assembly mapping analysis
+
+**Table 2**. Transcriptome assembly mapping statistics.
+
+```{r echo=F, message=F, warning=F, fig.align='center', results="asis"}
+#Displaying the transcriptome assembly mapping statistics kable
+display_kable(transcriptome_map_stats)
+```
+IQR = interquartile range
+<br>
+<br>
+
+```{r echo=F, message=F, warning=F, fig.align='center', fig.height=5, fig.width=`BP_BP3_WIDTH`}
+#Displaying the transcript alignment proportion barplot
+knitr::include_graphics(paste("transcript_alignment_proportion", FIGURE_EXT, sep = "."))
+```
+**Figure 2.** Transcript alignment proportion category distribution.
+<br>
+<br>
+
+```{r echo=F, message=F, warning=F, fig.align='center', fig.height=5, fig.width=`BP_BP3_WIDTH`}
+#Displaying the number of exons per transcript barplot
+knitr::include_graphics(paste("number_of_exons_per_transcript", FIGURE_EXT, sep = "."))
+```
+**Figure 3.** Number of exons per transcript category distribution.
+<br>
+<br>
+
+```{r echo=F, message=F, warning=F, fig.align='center', fig.height=`RP_HEIGHT`, fig.width=`RP_WIDTH`}
+#Displaying the exon length raincloud plot
+knitr::include_graphics(paste("exon_length", FIGURE_EXT, sep = "."))
+```
+**Figure 4.** Exon length distribution.
+<br>
+<br>
+
+### Exon set analysis
+
+```{r echo=F, message=F, warning=F}
+#Checking the LONGEST_SCAFF_N argument
+invisible(gc(full = T))
+if (STRANDED == F) {
+ MAPPED_TR_SCAFF_N <- exon_mappings[, length(unique(scaff_name))]
+} else {
+ MAPPED_TR_SCAFF_N <- exon_mappings[, length(unique(sub(".$", "", scaff_name)))]
+}
+if (MAPPED_TR_SCAFF_N < LONGEST_SCAFF_N) {
+ print("The supplied number of scaffolds for genomic location plotting is higher than the number of scaffolds with mapped transcripts. Defaulting to the number of scaffolds with mapped transcripts")
+ LONGEST_SCAFF_N <- MAPPED_TR_SCAFF_N
+}
+
+#Importing scaffold lengths from file
+scaff_lengths <- fread("scaff_lengths", header = F)
+setorder(scaff_lengths, -V2)
+scaff_lengths <- scaff_lengths[1 : LONGEST_SCAFF_N]
+setnames(scaff_lengths, c("scaff", "scaff_len"))
+
+#Defining exon sets and performing exon set genomic distribution analysis
+scaff_length_vec <- scaff_lengths[, scaff_len]
+names(scaff_length_vec) <- scaff_lengths[, scaff]
+rm(scaff_lengths)
+genomic_bins <- getGenomeBins(scaff_length_vec, binCount = GENOMIC_BIN_N)
+rm(scaff_length_vec)
+
+if (STRANDED == F) {
+ exon_gr <- makeGRangesFromDataFrame(exon_mappings, seqnames.field = "scaff_name", start.field = "exon_scaff_start", end.field = "exon_scaff_end", ignore.strand = T, keep.extra.columns = F)
+} else {
+ exon_mappings[, "scaff_name_wo_strand" := sub(".$", "", scaff_name)]
+ exon_gr <- makeGRangesFromDataFrame(exon_mappings, seqnames.field = "scaff_name_wo_strand", start.field = "exon_scaff_start", end.field = "exon_scaff_end", ignore.strand = T, keep.extra.columns = F)
+ exon_mappings[, "scaff_name_wo_strand" := NULL]
+} 
+mcols(exon_gr)$transcriptome <- exon_mappings[, transcriptome]
+if (STRANDED == F) {
+ rm(exon_mappings)
+}
+exon_set_gr <- reduce(split(exon_gr, mcols(exon_gr)$transcriptome), ignore.strand = T, min.gapwidth = 0)
+rm(exon_gr)
+exon_set_bins <- calcChromBins(exon_set_gr, genomic_bins)
+rm(genomic_bins)
+if (STRANDED == T) {
+ rm(exon_set_gr)
+}
+exon_set_bins[, "name" := factor(name, levels = transcriptome_names)]
+
+exon_set_gp <- ggplot(data = exon_set_bins, aes(x = withinGroupID, y = N, fill = name)) +
+ geom_bar(stat = "identity",  position = "fill") +
+ theme_classic() +
+ scale_fill_manual(values = GP_COLORS, name = "Transcriptome") + 
+ theme(legend.position = "bottom") +
+ facet_grid(chr ~ .) +
+ theme(panel.spacing = unit(0, "lines")) +  
+ theme(strip.text.y = element_text(size = BP_HP_GP_BP3_LABEL_SIZE, angle = 0))  +
+ xlab("Genomic bins") +
+ theme(axis.title.y = element_blank()) +
+ theme(axis.text.y = element_blank()) +
+ ggtitle("Exon set genomic distribution")
+ggsave(exon_set_gp, filename = paste("exon_set_genomic_distribution", FIGURE_EXT, sep = "."), height = GP_HEIGHT, width = 9, dpi = FIGURE_DPI)
+rm(exon_set_bins, exon_set_gp)
+
+#Preparing for exon set length analysis
+if (STRANDED == T) {
+ exon_gr <- makeGRangesFromDataFrame(exon_mappings, seqnames.field = "scaff_name", start.field = "exon_scaff_start", end.field = "exon_scaff_end", ignore.strand = T, keep.extra.columns = F)
+ mcols(exon_gr)$transcriptome <- exon_mappings[, transcriptome]
+ rm(exon_mappings)
+ exon_set_gr <- reduce(split(exon_gr, mcols(exon_gr)$transcriptome), ignore.strand = T, min.gapwidth = 0)
+ rm(exon_gr)
+}
+exon_set_gr <- unlist(exon_set_gr, use.names = T)
+mcols(exon_set_gr)$transcriptome  <- names(exon_set_gr)
+names(exon_set_gr) <- NULL
+
+#Writing exon set coordinates to file
+exon_sets <- as.data.table(exon_set_gr)
+exon_sets[, "strand" := NULL]
+exon_sets[, "transcriptome" := factor(transcriptome, levels = transcriptome_names)]
+setorder(exon_sets, transcriptome, seqnames, start, end)
+write.table(setnames(exon_sets[, .(seqnames, start, end, transcriptome)], c("scaff", "scaff_start", "scaff_end", "transcriptome")), file = "exon_sets.tsv", sep = "\t", row.names = F, col.names = T, quote = F)
+setorder(exon_sets, transcriptome)
+
+#Calculating the number of exon sets per transcriptome assembly
+exon_set_N <- exon_sets[, .N, by = "transcriptome"]
+exon_set_stats <- as.data.table(t(exon_set_N))[2]
+
+#Plotting exon set length
+exon_set_len_stats <- analyse_numerical_variable(exon_sets, "width", "Exon set length")
+exon_set_stats <- rbindlist(list(exon_set_stats, exon_set_len_stats))
+rm(exon_set_len_stats)
+
+#Filtering exon sets by length
+exon_set_gr <- exon_set_gr[width(exon_set_gr) >= MIN_EX_SET_LEN]
+if (length(exon_set_gr) == 0) {
+ print("None of the exon sets remained after length filtering. Exiting")
+ knit_exit()
+}
+
+#Preparing for exon set comparison 
+mcols(exon_set_gr)$el_set_id <- 1 : length(exon_set_gr)
+exon_sets <- as.data.table(exon_set_gr)
+exon_sets[, "strand" := NULL]
+exon_sets[, "transcriptome" := factor(transcriptome, levels = transcriptome_names)]
+exon_set_comp_N <- exon_sets[, .N, by = "transcriptome"]
+setorder(exon_set_comp_N, transcriptome)
+exon_set_comp_prop <- calculate_proportions(exon_set_comp_N, exon_set_N)
+rm(exon_set_N)
+
+#Exon set comparison
+if(TRANSCRIPTOME_N > 1) {
+ exon_set_stats <- rbindlist(list(exon_set_stats, exon_set_comp_prop))
+ exon_set_comparison_results <- compare_element_sets("exon set") 
+ rm(exon_sets)
+ if(PERFORM_ANNOT_ANALYSIS == F) {
+  rm(exon_set_gr)
+ }
+ 
+#Analysing unique exon sets
+ if (is.null(exon_set_comparison_results[[1]]) == F) {
+  unique_exon_set_N_stats <- exon_set_comparison_results[[1]][, .N, by = "transcriptome"]
+  unique_exon_set_N_stats <- calculate_proportions(unique_exon_set_N_stats, exon_set_comp_N)
+  unique_exon_set_len_stats <- analyse_numerical_variable(exon_set_comparison_results[[1]], "width", "Unique exon set length")
+  exon_set_comparison_results[[1]][, "width" := NULL]
+  show_unique_exon_set_plots <- T
+ } else {
+  unique_exon_set_N_stats <- rep("0, 0.00%", TRANSCRIPTOME_N)
+  unique_exon_set_len_stats <- as.list(rep("No objects", TRANSCRIPTOME_N))
+  show_unique_exon_set_plots <- F
+ }
+ exon_set_stats <- rbindlist(list(exon_set_stats, as.list(unique_exon_set_N_stats)))
+ rm(unique_exon_set_N_stats)
+ exon_set_stats <- rbindlist(list(exon_set_stats, unique_exon_set_len_stats))
+ rm(unique_exon_set_len_stats)
+ 
+#Analysing missing exon sets
+ missing_exon_sets <- count_missing_elements(exon_set_comparison_results[[3]])
+ exon_set_comparison_results[[3]][, "transcriptome_N" := NULL]
+ exon_set_stats <- rbindlist(list(exon_set_stats, as.list(missing_exon_sets[[1]])))
+ exon_set_stats <- rbindlist(list(exon_set_stats, as.list(missing_exon_sets[[2]])))
+ rm(missing_exon_sets)
+ 
+#Adding common exon set statistics
+ if(is.null(exon_set_comparison_results[[5]]) == F) {
+  exon_set_stats <- rbindlist(list(exon_set_stats, exon_set_comparison_results[[5]]))
+  exon_set_stats <- rbindlist(list(exon_set_stats, exon_set_comparison_results[[6]]))
+  show_common_exon_set_plots <- T
+ } else {
+  exon_set_stats <- rbindlist(list(exon_set_stats, as.list(rep(NA, TRANSCRIPTOME_N))))
+  exon_set_stats <- rbindlist(list(exon_set_stats, as.list(rep(NA, TRANSCRIPTOME_N))))
+  show_common_exon_set_plots <- F
+ }
+ exon_set_comparison_results[[5]] <- NULL
+ exon_set_comparison_results[[5]] <- NULL
+ 
+#Adding relative exon score
+ exon_set_stats <- rbindlist(list(exon_set_stats, as.list(exon_set_comparison_results[[5]])))
+ exon_set_comparison_results[[5]] <- NULL
+}
+
+#Defining transcript sets
+transcripts[, "transcriptome" := sub(",trs,.*", "", tr_name)]
+transcript_gr <- makeGRangesFromDataFrame(transcripts, seqnames.field  = "scaff_name", start.field = "scaff_start", end.field = "scaff_end", ignore.strand = T, keep.extra.columns = T)
+rm(transcripts)
+transcript_set_gr <- unlist(reduce(split(transcript_gr, transcript_gr$transcriptome), ignore.strand = T, min.gapwidth = 0), use.names = T)
+mcols(transcript_set_gr)$transcriptome <- names(transcript_set_gr)
+names(transcript_set_gr) <- NULL
+
+#Writing transcript set coordinates to file
+transcript_sets <- as.data.table(transcript_set_gr)
+transcript_sets[, "strand" := NULL]
+transcript_sets[, "transcriptome" := factor(transcriptome, levels = transcriptome_names)]
+setorder(transcript_sets, transcriptome, seqnames, start, end)
+write.table(setnames(transcript_sets[, .(seqnames, start, end, transcriptome)], c("scaff", "scaff_start", "scaff_end", "transcriptome")), file = "transcript_sets.tsv", sep = "\t", row.names = F, col.names = T, quote = F)
+
+#Calculating the number of transcript sets per transcriptome assembly
+transcript_set_N <- transcript_sets[, .N, by = "transcriptome"]
+transcript_set_stats <- as.data.table(t(transcript_set_N))[2]
+
+#Plotting transcript set length
+tr_set_length_stats <- analyse_numerical_variable(transcript_sets, "width", "Transcript set length")
+transcript_set_stats <- rbindlist(list(transcript_set_stats, tr_set_length_stats))
+rm(tr_set_length_stats)
+
+#Specifying isoforms
+isoform_per_tr_set_N_dt <- list()
+for (i in 1 : TRANSCRIPTOME_N) {
+ tr_set_trans_gr <- transcript_set_gr[mcols(transcript_set_gr)$transcriptome == transcriptome_names[i]]
+ tr_trans_gr <- transcript_gr[mcols(transcript_gr)$transcriptome == transcriptome_names[i]]
+ tr_set_tr_ovl <- findOverlaps(tr_set_trans_gr, tr_trans_gr, ignore.strand = T, maxgap = -1, minoverlap = MIN_ISO_OVL)
+ isoform_per_tr_set_N <- as.data.table(queryHits(tr_set_tr_ovl))[, .(isoform_N = .N), by = "V1"]
+ isoform_per_tr_set_N[, "transcriptome" := transcriptome_names[i]]
+ isoform_per_tr_set_N_dt[[i]] <- isoform_per_tr_set_N
+}
+rm(tr_set_trans_gr, tr_trans_gr, tr_set_tr_ovl, isoform_per_tr_set_N)
+isoform_per_tr_set_N_dt <- rbindlist(isoform_per_tr_set_N_dt)
+
+#Plotting the number of isoforms per transcript set
+isoform_N_stats <- analyse_categorical_variable(isoform_per_tr_set_N_dt, "isoform_N", ISO_N_BREAKS, "Number of isoforms per transcript set", "Transcript set")
+rm(isoform_per_tr_set_N_dt)
+transcript_set_stats <- rbindlist(list(transcript_set_stats, isoform_N_stats))
+rm(isoform_N_stats)
+
+#Preparing for positional unique exon set analysis
+if (TRANSCRIPTOME_N > 1) {
+ if(show_unique_exon_set_plots == T) { 
+  unique_exon_set_gr <- makeGRangesFromDataFrame(exon_set_comparison_results[[1]], seqnames.field = "seqnames", start.field = "start", end.field = "end", ignore.strand = T, keep.extra.columns = T)
+  exon_set_comparison_results[[1]] <- NULL
+  unique_ex_set_tr_ovl_dt <- list()
+  unique_ex_set_tr_set_pos_dt <- list()
+
+#Writing unique exon set coordinates to file and performing positional unique exon set analysis
+  for(i in 1 : TRANSCRIPTOME_N) {
+   unique_ex_set_gr_trans <- unique_exon_set_gr[mcols(unique_exon_set_gr)$transcriptome == transcriptome_names[i]]
+   if (length(unique_ex_set_gr_trans) != 0) {
+    tr_trans_gr <- transcript_gr[mcols(transcript_gr)$transcriptome == transcriptome_names[i]]
+    unique_ex_set_tr_ovl_dt[[i]] <- find_overlaps(unique_ex_set_gr_trans, tr_trans_gr, -1L, 1L, F, c("seqnames", "start", "end"), c("tr_name", "transcriptome"), F)
+    
+    tr_set_no_trans_gr <- transcript_set_gr[mcols(transcript_set_gr)$transcriptome != transcriptome_names[i]]
+    unique_ex_set_tr_set_ovl <- find_overlaps(unique_ex_set_gr_trans, tr_set_no_trans_gr, TR_SET_PROX_LEN, 0L, F, c("start", "end", "transcriptome", "el_set_id"), c("start", "end", "transcriptome"), F)
+    if(is.null(unique_ex_set_tr_set_ovl) == F) {
+     unique_ex_set_tr_set_ovl[, "ovl_category" := fifelse(start1 >= start2 & end1 <= end2, "inside", "outside")]
+     unique_ex_set_tr_set_ovl_N <- unique_ex_set_tr_set_ovl[, .N, by = c("transcriptome1", "ovl_category", "transcriptome2")]
+     unique_ex_set_wo_close_tr_set_N <- data.table(transcriptome1 = transcriptome_names[i], ovl_category = "w/o close tr set", transcriptome2 = "w/o close tr set", N = length(which(mcols(unique_ex_set_gr_trans)$el_set_id %in% unique_ex_set_tr_set_ovl[, el_set_id1] == F)))
+     unique_ex_set_tr_set_pos_dt[[i]] <- rbindlist(list(unique_ex_set_tr_set_ovl_N, unique_ex_set_wo_close_tr_set_N))
+    } else {
+     unique_ex_set_tr_set_pos_dt[[i]] <- data.table(transcriptome1 = transcriptome_names[i], ovl_category = "w/o close tr set", transcriptome2 = "w/o close tr set", N = length(unique_ex_set_gr_trans))
+    }
+   }
+  }
+  rm(unique_exon_set_gr, unique_ex_set_gr_trans, tr_trans_gr, tr_set_no_trans_gr, unique_ex_set_tr_set_ovl, unique_ex_set_tr_set_ovl_N, unique_ex_set_wo_close_tr_set_N)
+  
+  unique_ex_set_tr_ovl_dt <- rbindlist(unique_ex_set_tr_ovl_dt)
+  unique_ex_set_tr_ovl_dt[, "tr_name2" := sub(".*,trs,|_mapid.*", "", tr_name2)]
+  setnames(unique_ex_set_tr_ovl_dt, c("scaff", "scaff_start", "scaff_end", "tr_name", "transcriptome"))
+  unique_ex_set_tr_ovl_dt[, "transcriptome" := factor(transcriptome, levels = transcriptome_names)]
+  setorder(unique_ex_set_tr_ovl_dt, transcriptome, tr_name, scaff_start, scaff_end)
+  write.table(unique_ex_set_tr_ovl_dt, file = "unique_exon_sets.tsv", sep = "\t", row.names = F, col.names = T, quote = F)
+  rm(unique_ex_set_tr_ovl_dt)
+  unique_ex_set_tr_set_pos_dt <- rbindlist(unique_ex_set_tr_set_pos_dt)
+  setnames(unique_ex_set_tr_set_pos_dt, c("transcriptome", "ovl_category", "transcriptome_target", "N"))
+  zero_occ_ex_set_dt <- data.table(transcriptome = setdiff(transcriptome_names, unique(unique_ex_set_tr_set_pos_dt[, transcriptome])), ovl_category = "inside", transcriptome_target = setdiff(transcriptome_names, unique(unique_ex_set_tr_set_pos_dt[, transcriptome])), N = NA)
+  unique_ex_set_tr_set_pos_dt <- add_missing_transcriptomes(unique_ex_set_tr_set_pos_dt, zero_occ_ex_set_dt)
+  rm(zero_occ_ex_set_dt)
+  unique_ex_set_tr_set_pos_dt[, "ovl_category" := factor(ovl_category, levels = c("w/o close tr set", "outside", "inside"))]
+  unique_ex_set_tr_set_pos_dt[, "transcriptome" := factor(transcriptome, levels = transcriptome_names)]
+  unique_ex_set_tr_set_pos_dt[, "transcriptome_target" := factor(transcriptome_target, levels = c("w/o close tr set", transcriptome_names))]
+  
+  unique_ex_set_tr_set_pos_bp <- ggplot(unique_ex_set_tr_set_pos_dt, aes(x = transcriptome_target, y = N, fill = ovl_category)) +
+   geom_bar(stat = "identity", position = "stack", width = 0.9, alpha = 0.8) +
+   theme_bw() +
+   scale_fill_manual(values = c("goldenrod1", "chocolate1", "firebrick3"), name = "Proximity type", labels = c("No neighbours", "Proximal", "Within transcript set")) +
+   theme(legend.position = "bottom") +
+   facet_wrap(. ~ transcriptome) +
+   theme(strip.text.x = element_text(size = BP2_LABEL_SIZE)) +
+   xlab("Non-origin transcriptome") +
+   ylab("Number of unique exon sets") +
+   theme(axis.title.y = element_text(size = 8)) +
+   theme(axis.text.x = element_text(angle = 90, hjust = 0.9, size = BP2_LABEL2_SIZE)) +
+   ggtitle("Unique exon set position in non-origin transcriptomes") 
+  ggsave(unique_ex_set_tr_set_pos_bp, filename = paste("unique_exon_set_position_in_non_origin_transcriptomes", FIGURE_EXT, sep = "."), height = BP2_HEIGHT, width = BP2_WIDTH, dpi = FIGURE_DPI)
+  rm(unique_ex_set_tr_set_pos_dt, unique_ex_set_tr_set_pos_bp)
+ } else {
+  exon_set_comparison_results[[1]] <- NULL
+  write.table(data.table(), file = "unique_exon_sets.tsv", sep = "\t", row.names = F, col.names = T, quote = F)
+ }
+  
+#Preparing for positional missing exon set analysis and writing missing exon set coordinates to file
+ if (exon_set_comparison_results[[2]][, .N] != 0) {
+  exon_set_comparison_results[[1]] <-  exon_set_comparison_results[[1]][, .(scaff_start_min = min(start), scaff_end_max = max(end)), by = c("group_id", "seqnames")]  
+  exon_set_comparison_results[[2]] <- exon_set_comparison_results[[1]][exon_set_comparison_results[[2]], on = "group_id"] 
+  exon_set_comparison_results[[1]] <- NULL
+  setorder(exon_set_comparison_results[[1]], transcriptome, seqnames, scaff_start_min, scaff_end_max)
+  write.table(setnames(exon_set_comparison_results[[1]][, .(seqnames, scaff_start_min, scaff_end_max, transcriptome)], c("scaff", "scaff_start", "scaff_end", "transcriptome")), file = "missing_exon_set_ranges.tsv", sep = "\t", row.names = F, col.names = T, quote = F)
+  missing_exon_set_gr <- makeGRangesFromDataFrame(exon_set_comparison_results[[1]], seqnames.field = "seqnames", start.field = "scaff_start_min", end.field = "scaff_end_max", ignore.strand = T, keep.extra.columns = T)
+  exon_set_comparison_results[[1]] <- NULL
+  
+#Performing positional missing exon set analysis
+  missing_ex_set_tr_set_pos_dt <- list()
+  for (i in 1 : TRANSCRIPTOME_N) {
+   missing_ex_set_gr_trans <- missing_exon_set_gr[mcols(missing_exon_set_gr)$transcriptome == transcriptome_names[i]]
+   if (length(missing_ex_set_gr_trans) != 0) {
+    tr_set_trans_gr <- transcript_set_gr[mcols(transcript_set_gr)$transcriptome == transcriptome_names[i]]
+    missing_ex_set_tr_set_ovl <- find_overlaps(missing_ex_set_gr_trans, tr_set_trans_gr, -1L, 1L, F, "group_id", c(), F)
+    if (is.null(missing_ex_set_tr_set_ovl) == F) {
+     missing_ex_set_tr_set_ovl_ins <- data.table(group_id =  unique(missing_ex_set_tr_set_ovl[, group_id1]), category_ovl = "inside", transcriptome = transcriptome_names[i])
+     missing_ex_set_tr_set_ovl_out <-  data.table(group_id = mcols(missing_ex_set_gr_trans)$group_id[mcols(missing_ex_set_gr_trans)$group_id %in% missing_ex_set_tr_set_ovl[, group_id1] == F], category_ovl = "outside", transcriptome = transcriptome_names[i])
+     missing_ex_set_tr_set_pos_dt[[i]] <- rbindlist(list(missing_ex_set_tr_set_ovl_ins, missing_ex_set_tr_set_ovl_out))
+    } else {
+     missing_ex_set_tr_set_pos_dt[[i]] <- data.table(group_id = mcols(missing_ex_set_gr_trans)$group_id, category_ovl = "outside", transcriptome = transcriptome_names[i])
+    }
+   }
+  }
+  rm(missing_exon_set_gr, missing_ex_set_gr_trans, tr_set_trans_gr, missing_ex_set_tr_set_ovl, missing_ex_set_tr_set_ovl_ins, missing_ex_set_tr_set_ovl_out)
+  
+  missing_ex_set_tr_set_pos_dt <- rbindlist(missing_ex_set_tr_set_pos_dt)
+  missing_ex_set_tr_set_pos_dt <- missing_ex_set_tr_set_pos_dt[, .N, by = c("transcriptome", "category_ovl")]
+  missing_ex_set_tr_set_pos_dt[, "transcriptome" := factor(transcriptome, levels = transcriptome_names)]
+  missing_ex_set_tr_set_pos_dt[, "category_ovl" := factor(category_ovl, levels = c("outside", "inside"))]
+  
+  missing_ex_set_tr_set_pos_bp <- ggplot(data = missing_ex_set_tr_set_pos_dt, aes(x = transcriptome, y = N, fill = category_ovl)) +
+   geom_bar(stat = "identity", position = "fill", width = BP_BP3_BAR_WIDTH, color = "black", alpha = 0.8) +
+   theme_bw() +
+   theme(legend.position = "top") +
+   scale_fill_manual(values = c("firebrick3", "chocolate1"), name = "Position", labels = c("Outside of transcript sets", "Within transcript sets")) +
+   xlab("Transcriptome with missing exon sets") +
+   ylab("Missing exon set proportion") +
+   theme(axis.text.x = element_text(angle = BP_TP_BP3_AXIS_ANGLE, hjust = BP_TP_BP3_AXIS_HJUST, size = BP_HP_GP_BP3_LABEL_SIZE)) +
+   ggtitle("Missing exon set position") 
+  ggsave(missing_ex_set_tr_set_pos_bp, filename = paste("missing_exon_set_position", FIGURE_EXT, sep = "."), height = 5, width = BP_BP3_WIDTH, dpi = FIGURE_DPI)
+  
+  show_missing_ex_set_pos_plot <- T
+  missing_ex_set_tr_set_pos_ins_N <- missing_ex_set_tr_set_pos_dt[category_ovl == "inside", .(transcriptome, N)]
+  zero_occ_ex_set_ins_dt <-  data.table(transcriptome = setdiff(transcriptome_names, missing_ex_set_tr_set_pos_ins_N[, transcriptome]), N = 0)
+  missing_ex_set_tr_set_pos_ins_N <- add_missing_transcriptomes(missing_ex_set_tr_set_pos_ins_N, zero_occ_ex_set_ins_dt)
+  missing_ex_set_tr_set_pos_out_N <- missing_ex_set_tr_set_pos_dt[category_ovl == "outside", .(transcriptome, N)]
+  rm(missing_ex_set_tr_set_pos_dt, zero_occ_ex_set_ins_dt)
+  zero_occ_ex_set_out_dt <-  data.table(transcriptome = setdiff(transcriptome_names, missing_ex_set_tr_set_pos_out_N[, transcriptome]), N = 0)
+  missing_ex_set_tr_set_pos_out_N <- add_missing_transcriptomes(missing_ex_set_tr_set_pos_out_N, zero_occ_ex_set_out_dt)
+  rm(zero_occ_ex_set_out_dt)
+ } else {
+  exon_set_comparison_results[[1]] <- NULL
+  exon_set_comparison_results[[1]] <- NULL
+  write.table(data.table(), file = "missing_exon_set_ranges.tsv", sep = "\t", row.names = F, col.names = T, quote = F)
+  show_missing_ex_set_pos_plot <- F
+  missing_ex_set_tr_set_pos_ins_N <- data.table(N = rep(0, TRANSCRIPTOME_N))
+  missing_ex_set_tr_set_pos_out_N <- data.table(N = rep(0, TRANSCRIPTOME_N))
+ }
+ exon_set_stats <- rbindlist(list(exon_set_stats, as.list(missing_ex_set_tr_set_pos_ins_N[, N]), as.list(missing_ex_set_tr_set_pos_out_N[, N])))
+ rm(missing_ex_set_tr_set_pos_ins_N, missing_ex_set_tr_set_pos_out_N)
+
+#Generating exon set statistics
+ exon_set_stat_params <- c("N exon sets", "Exon set length (bp) (mean, IQR)", "N, % exon sets included in completeness analyses", "N, % unique exon sets", "Unique exon set length (bp) (mean, IQR)", "N missing exon sets found in any transcriptome assembly", "N missing exon sets found in all other transcriptome assemblies", "Common exon set length (bp) (mean, IQR)", "Relative common exon set length (mean, IQR)", "Relative exon score", "N missing exon sets inside transcript sets", "N missing exon sets outside transcript sets")
+} else {
+ exon_set_stat_params <- c("N exon sets", "Exon set length (bp) (mean, IQR)")
+}
+exon_set_stats <- cbind(exon_set_stat_params, exon_set_stats)
+rm(exon_set_stat_params)
+colnames(exon_set_stats) <- c("Parameter", transcriptome_names)
+```
+
+**Table 3.** Exon set statistics.
+
+```{r echo=F, message=F, warning=F, fig.align='center', results="asis"}
+#Displaying the exon set statistics kable
+display_kable(exon_set_stats)
+```
+IQR = interquartile range
+<br>
+<br>
+
+```{r echo=F, message=F, warning=F, fig.align='center', fig.height=`RP_HEIGHT`, fig.width=`RP_WIDTH`}
+#Displaying the exon set length raincloud plot
+knitr::include_graphics(paste("exon_set_length", FIGURE_EXT, sep = "."))
+```
+**Figure 5.** Exon set length distribution.
+<br>
+<br>
+
+```{r echo=F, message=F, warning=F, fig.align='center', fig.height=`GP_HEIGHT`}
+#Displaying the exon set genomic distribution plot
+knitr::include_graphics(paste("exon_set_genomic_distribution", FIGURE_EXT, sep = "."))
+```
+**Figure 6.** Exon set genomic distribution.
+<br>
+<br>
+
+**Exon set UpSet plot**
+```{r echo=F, message=F, warning=F, fig.align='center', fig.height=`UP_HEIGHT`}
+#Displaying the exon set UpSet plot
+if (TRANSCRIPTOME_N > 1) {
+ if (is.null(exon_set_comparison_results[[1]]) == F) {
+  exon_set_comparison_results[[1]] 
+ } else {
+  print("No unique exon sets found - UpSet plots are not shown") 
+ }
+} else {
+ print("UpSet plots are not defined in single-transcriptome analyses")
+}
+if (TRANSCRIPTOME_N > 1) {
+ exon_set_comparison_results[[1]] <- NULL
+}
+```
+**Figure 7.** Exon set UpSet plot.
+<br>
+<br>
+
+```{r echo=F, message=F, warning=F, fig.align='center', fig.height=`RP_HEIGHT`, fig.width=`RP_WIDTH`}
+#Displaying the common exon set length raincloud plot
+if (TRANSCRIPTOME_N > 1) {
+ if (show_common_exon_set_plots == T) {
+  knitr::include_graphics(paste("common_exon_set_length", FIGURE_EXT, sep = "."))
+ } else {
+  print("No common exon sets found")
+ }
+} else {
+ print("Common element sets are not defined in single-transcriptome analyses")
+}
+```
+**Figure 8.**  Common exon set length distribution.
+<br>
+<br>
+
+```{r echo=F, message=F, warning=F, fig.align='center', fig.height=5, fig.width=`BP_BP3_WIDTH`}
+#Displaying the common exon set relative length barplot
+if (TRANSCRIPTOME_N > 1) {
+ if (show_common_exon_set_plots == T) {
+  knitr::include_graphics(paste("common_exon_set_relative_length", FIGURE_EXT, sep = "."))
+ } else {
+  print("No common exon sets found")
+ }
+} else {
+ print("Common element sets are not defined in single-transcriptome analyses")
+}
+```
+**Figure 9.**  Common exon set relative length category distribution.
+<br>
+<br>
+
+```{r echo=F, message=F, warning=F, fig.align='center', fig.height=`RP_HEIGHT`, fig.width=`RP_WIDTH`}
+#Displaying the unique exon set length raincloud plot
+if (TRANSCRIPTOME_N > 1) {
+ if (show_unique_exon_set_plots == T) {
+  knitr::include_graphics(paste("unique_exon_set_length", FIGURE_EXT, sep = "."))
+ } else {
+  print("No unique exon sets found")
+ }
+} else {
+ print("Unique element sets are not defined in single-transcriptome analyses")
+}
+```
+**Figure 10.**  Unique exon set length distribution.
+<br>
+<br>
+
+```{r echo=F, message=F, warning=F, fig.align='center', fig.height=`TP_HEIGHT`, fig.width=`TP_WIDTH`}
+#Displaying the exon set pairwise completeness similarity tileplot
+if (TRANSCRIPTOME_N > 1) {
+ knitr::include_graphics(paste("exon_set_pairwise_comp_similarity_tileplot", FIGURE_EXT, sep = "."))
+} else {
+ print("Exon set pairwise completeness similarity is not defined in single-transcriptome analyses")
+}
+```
+**Figure 11.**  Exon set pairwise completeness similarity.
+<br>
+<br>
+
+**Pairwise exon set Venn diagrams**
+```{r echo=F, message=F, warning=F, fig.align='center', fig.height=`WD_HEIGHT_WIDTH`, fig.width=`WD_HEIGHT_WIDTH`}
+#Displaying the pairwise exon set Venn diagrams
+if (TRANSCRIPTOME_N > 1 & TRANSCRIPTOME_N <= 10) {
+ knitr::include_graphics(paste("pairwise_exon_set_venn_diagrams", FIGURE_EXT, sep = "."))
+} else {
+ print("Venn diagrams are not shown when N(transcriptomes) > 10 or in single-transcriptome analyses")
+}
+```
+**Figure 12.**  Pairwise exon set Venn diagrams.
+<br>
+<br>
+
+```{r echo=F, message=F, warning=F, fig.align='center', fig.height=`HP_HEIGHT`, fig.width=`HP_WIDTH`}
+#Displaying the exon set hierarchical clustering heatmap
+if (TRANSCRIPTOME_N > 1) {
+ if (is.null(exon_set_comparison_results[[1]]) == F) {
+  exon_set_comparison_results[[1]]
+ } else {
+  print("Exon set hierarchical clustering heatmap is not defined in the event of all analysed transcriptome assemblies containing identical exon sets") 
+ }
+} else {
+ print("Hierarchical clustering heatmap is not defined in single-transcriptome analyses")
+}
+if (TRANSCRIPTOME_N > 1) {
+ exon_set_comparison_results[[1]]  <- NULL
+}
+```
+**Figure 13.**  Exon set hierarchical clustering heatmap.
+<br>
+<br>
+
+### Transcript set analysis
+
+```{r echo=F, message=F, warning=F}
+#Filtering transcript sets by length
+invisible(gc(full = T))
+transcript_set_gr <- transcript_set_gr[width(transcript_set_gr) >= MIN_TR_SET_LEN & width(transcript_set_gr) <= MAX_TR_SET_LEN]
+if (length(transcript_set_gr) == 0) {
+ print("None of the transcript sets remained after length filtering. Exiting")
+ knit_exit()
+}
+
+#Preparing for transcript set comparison 
+mcols(transcript_set_gr)$el_set_id <- 1 : length(transcript_set_gr)
+transcript_sets <- as.data.table(transcript_set_gr)
+transcript_sets[, "strand" := NULL]
+transcript_sets[, "transcriptome" := factor(transcriptome, levels = transcriptome_names)]
+transcript_set_comp_N <- transcript_sets[, .N, by = "transcriptome"]
+setorder(transcript_set_comp_N, transcriptome)
+transcript_set_comp_prop <- calculate_proportions(transcript_set_comp_N, transcript_set_N)
+rm(transcript_set_N)
+
+#Transcript set comparison
+if (TRANSCRIPTOME_N > 1) {
+ transcript_set_stats <- rbindlist(list(transcript_set_stats, transcript_set_comp_prop))
+ tr_set_comparison_results  <- compare_element_sets("transcript set")
+ rm(transcript_sets)
+ if (PERFORM_ANNOT_ANALYSIS == F) {
+  rm(transcript_set_gr)
+ }
+ 
+#Analysing unique transcript sets, writing unique transcript sets to file
+ if (is.null(tr_set_comparison_results[[1]]) == F) {
+  unique_tr_set_N_stats <- tr_set_comparison_results[[1]][, .N, by = "transcriptome"]
+  unique_tr_set_N_stats <- calculate_proportions(unique_tr_set_N_stats, transcript_set_comp_N)  
+  unique_tr_set_len_stats <- analyse_numerical_variable(tr_set_comparison_results[[1]], "width", "Unique transcript set length")
+  
+  unique_tr_set_gr <- makeGRangesFromDataFrame(tr_set_comparison_results[[1]], seqnames.field = "seqnames", start.field = "start", end.field = "end", ignore.strand = T, keep.extra.columns = T)
+  tr_set_comparison_results[[1]] <- NULL
+  unique_tr_set_tr_ovl_dt <- list()
+  for(i in 1 : TRANSCRIPTOME_N) {
+   unique_tr_set_gr_trans <- unique_tr_set_gr[mcols(unique_tr_set_gr)$transcriptome == transcriptome_names[i]]
+   if (length(unique_tr_set_gr_trans) != 0) {
+    tr_trans_gr <- transcript_gr[mcols(transcript_gr)$transcriptome == transcriptome_names[i]]
+    unique_tr_set_tr_ovl_dt[[i]] <- find_overlaps(unique_tr_set_gr_trans, tr_trans_gr, -1L, 1L, F, c("seqnames", "start", "end"), c("tr_name", "transcriptome"), F)
+   }
+  }
+  rm(unique_tr_set_gr, unique_tr_set_gr_trans, tr_trans_gr)
+  
+  unique_tr_set_tr_ovl_dt <- rbindlist(unique_tr_set_tr_ovl_dt)
+  unique_tr_set_tr_ovl_dt[, "tr_name2" := sub(".*,|_mapid_.*", "", tr_name2)]
+  setnames(unique_tr_set_tr_ovl_dt, c("scaff", "scaff_start", "scaff_end", "tr_name", "transcriptome"))
+  unique_tr_set_tr_ovl_dt[, "transcriptome" := factor(transcriptome, levels = transcriptome_names)]
+  setorder(unique_tr_set_tr_ovl_dt, transcriptome, tr_name, scaff_start, scaff_end)
+  write.table(unique_tr_set_tr_ovl_dt, file = "unique_transcript_sets.tsv", sep = "\t", row.names = F, col.names = T, quote = F)
+  rm(unique_tr_set_tr_ovl_dt)
+  show_unique_tr_set_plot <- T
+ } else {
+  unique_tr_set_N_stats <- rep("0,0.0%", TRANSCRIPTOME_N)
+  unique_tr_set_len_stats <- as.list(rep("No objects", TRANSCRIPTOME_N))
+  tr_set_comparison_results[[1]] <- NULL
+  write.table(data.table(), file = "unique_transcript_sets.tsv", sep = "\t", row.names = F, col.names = T, quote = F)
+  show_unique_tr_set_plot <- F
+ }
+ transcript_set_stats <- rbindlist(list(transcript_set_stats, as.list(unique_tr_set_N_stats)))
+ rm(unique_tr_set_N_stats)
+ transcript_set_stats <- rbindlist(list(transcript_set_stats, as.list(unique_tr_set_len_stats)))
+ rm(unique_tr_set_len_stats)
+ 
+#Analysing missing transcript sets
+ missing_tr_sets <- count_missing_elements(tr_set_comparison_results[[1]])
+ tr_set_comparison_results[[1]] <- NULL
+ transcript_set_stats <- rbindlist(list(transcript_set_stats, as.list(missing_tr_sets[[1]])))
+ transcript_set_stats <- rbindlist(list(transcript_set_stats, as.list(missing_tr_sets[[2]])))
+ rm(missing_tr_sets)
+ 
+#Adding common transcript set statistics
+ if(is.null(tr_set_comparison_results[[2]]) == F) {
+  transcript_set_stats <- rbindlist(list(transcript_set_stats, tr_set_comparison_results[[2]]))  
+  transcript_set_stats <- rbindlist(list(transcript_set_stats, tr_set_comparison_results[[3]]))
+  show_common_tr_set_plots <- T
+ } else {
+  transcript_set_stats <- rbindlist(list(transcript_set_stats, as.list(rep(NA, TRANSCRIPTOME_N))))
+  transcript_set_stats <- rbindlist(list(transcript_set_stats, as.list(rep(NA, TRANSCRIPTOME_N))))
+  show_common_tr_set_plots <- F
+ }
+ tr_set_comparison_results[[2]] <- NULL
+ tr_set_comparison_results[[2]] <- NULL
+ 
+#Adding relative transcript score
+ transcript_set_stats <- rbindlist(list(transcript_set_stats, as.list(t(tr_set_comparison_results[[2]]))))
+ tr_set_comparison_results[[2]] <- NULL
+ 
+#Generating transcript set statistics
+ transcript_set_stat_params <- c("N transcript sets", "Transcript set length (bp) (mean, IQR)", "N isoforms per transcript set (mean, IQR)", "N, % transcript sets included in completeness analyses", "N, % unique transcript sets", "Unique transcript set length (bp) (mean, IQR)", "N missing transcript sets found in any transcriptome assembly", "N missing transcript sets found in all other transcriptome assemblies", "Common transcript set length (bp) (mean, IQR)", "Relative common transcript set length (mean, IQR)", "Relative transcript score")
+} else {
+ transcript_set_stat_params <- c("N transcript sets", "Transcript set length (bp) (mean, IQR)", "N isoforms per transcript set (mean, IQR)")
+}
+transcript_set_stats <- cbind(transcript_set_stat_params, transcript_set_stats)
+rm(transcript_set_stat_params)
+colnames(transcript_set_stats) <- c("Parameter", transcriptome_names)
+
+#Writing transcriptome assembly comparison statistics to file
+comparison_stats <- rbindlist(list(transcriptome_map_stats, exon_set_stats, transcript_set_stats))
+write.table(comparison_stats, file = "CATS_rb_main_comparison_results.tsv", sep = "\t", row.names = F, col.names = T, quote = F)
+rm(transcriptome_map_stats, exon_set_stats, comparison_stats)
+```
+
+**Table 4** Transcript set statistics.
+
+```{r echo=F, message=F, warning=F, fig.align='center', results="asis"}
+#Displaying the transcript set statistics kable
+display_kable(transcript_set_stats)
+rm(transcript_set_stats)
+```
+IQR = interquartile range
+<br>
+<br>
+
+```{r echo=F, message=F, warning=F, fig.align='center', fig.height=`RP_HEIGHT`, fig.width=`RP_WIDTH`}
+#Displaying the transcript set length raincloud plot
+knitr::include_graphics(paste("transcript_set_length", FIGURE_EXT, sep = "."))
+```
+**Figure 14.**  Transcript set length distribution.
+<br>
+<br>
+
+```{r echo=F, message=F, warning=F, fig.align='center', fig.height=5, fig.width=`BP_BP3_WIDTH`}
+#Displaying the number of isoforms per transcript set barplot
+knitr::include_graphics(paste("number_of_isoforms_per_transcript_set", FIGURE_EXT, sep = "."))
+```
+**Figure 15.**  Number of isoforms per transcript set category distribution.
+<br>
+<br>
+
+**Transcript set UpSet plot**
+```{r echo=F, message=F, warning=F, fig.align='center', fig.height=`UP_HEIGHT`}
+#Displaying the transcript set UpSet plot
+if (TRANSCRIPTOME_N > 1) {
+ if (is.null(tr_set_comparison_results[[1]]) == F) {
+  tr_set_comparison_results[[1]] 
+ } else {
+  print("No unique transcript sets found - UpSet plots are not shown") 
+ }
+} else {
+ print("UpSet plots are not defined in single-transcriptome analyses")
+}
+if (TRANSCRIPTOME_N > 1) {
+ tr_set_comparison_results[[1]] <- NULL
+}
+```
+**Figure 16.**  Transcript set UpSet plot
+<br>
+<br>
+
+```{r echo=F, message=F, warning=F, fig.align='center', fig.height=`RP_HEIGHT`, fig.width=`RP_WIDTH`}
+#Displaying the common transcript set length raincloud plot
+if (TRANSCRIPTOME_N > 1) { 
+ if (show_common_tr_set_plots == T) {
+  knitr::include_graphics(paste("common_transcript_set_length", FIGURE_EXT, sep = "."))
+ } else {
+  print("No common transcript sets found")
+ }
+} else {
+ print("Common element sets are not defined in single-transcriptome analyses")
+}
+```
+**Figure 17.**  Common transcript set length distribution.
+<br>
+<br>
+
+```{r echo=F, message=F, warning=F, fig.align='center', fig.height=5, fig.width=`BP_BP3_WIDTH`}
+#Displaying the common transcript set relative length barplot
+if (TRANSCRIPTOME_N > 1) { 
+ if (show_common_tr_set_plots == T) {
+  knitr::include_graphics(paste("common_transcript_set_relative_length", FIGURE_EXT, sep = "."))
+ } else {
+  print("No common transcript sets found")
+ }
+} else {
+ print("Common element sets are not defined in single-transcriptome analyses")
+}
+```
+**Figure 18.** Common transcript set relative length category distribution.
+<br>
+<br>
+
+```{r echo=F, message=F, warning=F, fig.align='center', fig.height=`RP_HEIGHT`, fig.width=`RP_WIDTH`}
+#Displaying the unique transcript set length raincloud plot
+if (TRANSCRIPTOME_N > 1) { 
+ if (show_unique_tr_set_plot  == T) {
+  knitr::include_graphics(paste("unique_transcript_set_length", FIGURE_EXT, sep = "."))
+ } else {
+  print("No unique transcript sets found")
+ }
+} else {
+ print("Unique element sets are not defined in single-transcriptome analyses")
+}
+```
+**Figure 19.**  Unique transcript set length distribution.
+<br>
+<br>
+
+```{r echo=F, message=F, warning=F, fig.align='center', fig.height=`TP_HEIGHT`, fig.width=`TP_WIDTH`}
+#Displaying the transcript set pairwise completeness similarity tileplot
+if (TRANSCRIPTOME_N > 1) {
+ knitr::include_graphics(paste("transcript_set_pairwise_comp_similarity_tileplot", FIGURE_EXT, sep = "."))
+} else {
+ print("Transcript set pairwise completeness similarity is not defined in single-transcriptome analyses")
+}
+```
+**Figure 20.**  Transcript set pairwise completeness similarity.
+<br>
+<br>
+
+**Pairwise transcript set Venn diagrams**
+```{r echo=F, message=F, warning=F, fig.align='center', fig.height=`WD_HEIGHT_WIDTH`, fig.width=`WD_HEIGHT_WIDTH`}
+#Displaying the pairwise transcript set Venn diagrams
+if (TRANSCRIPTOME_N > 1 & TRANSCRIPTOME_N <= 10) {
+ knitr::include_graphics(paste("pairwise_transcript_set_venn_diagrams", FIGURE_EXT, sep = "."))
+} else {
+ print("Venn diagrams are not shown when N(transcriptomes) > 10 or in single-transcriptome analyses")
+}
+```
+**Figure 21.**  Pairwise transcript set Venn diagrams.
+<br>
+<br>
+
+```{r echo=F, message=F, warning=F, fig.align='center', fig.height=`HP_HEIGHT`, fig.width=`HP_WIDTH`}
+#Displaying the transcript set hierarchical clustering heatmap
+if (TRANSCRIPTOME_N > 1) {
+ if (is.null(tr_set_comparison_results[[1]]) == F) {
+  tr_set_comparison_results[[1]]
+ } else {
+  print("Transcript set hierarchical clustering heatmap is not defined in the event of all analysed transcriptome assemblies containing identical transcript sets")
+ }
+} else {
+ print("Hierarchical clustering heatmap is not defined in single-transcriptome analyses")
+}
+if (TRANSCRIPTOME_N > 1) {
+ tr_set_comparison_results[[1]]  <- NULL
+}
+```
+**Figure 22.**  Transcript set hierarchical clustering heatmap.
+<br>
+<br>
+
+```{r echo=F, message=F, warning=F, fig.align='center', fig.height=`BP2_HEIGHT`, fig.width=`BP2_WIDTH`}
+#Displaying the unique exon set position in non-origin transcriptomes plot
+if (TRANSCRIPTOME_N > 1) { 
+ if (show_unique_exon_set_plots == T) {
+  knitr::include_graphics(paste("unique_exon_set_position_in_non_origin_transcriptomes", FIGURE_EXT, sep = "."))
+ } else {
+  print("No unique exon sets found")  
+ }
+} else {
+ print("Unique element sets are not defined in single-transcriptome analyses")
+}
+```
+**Figure 23.**  Unique exon set position in non-origin transcriptomes.
+<br>
+<br>
+
+```{r echo=F, message=F, warning=F, fig.align='center', fig.height=5, fig.width=`BP_BP3_WIDTH`}
+#Displaying the missing exon set position plot
+if (TRANSCRIPTOME_N > 1) {
+ if (show_missing_ex_set_pos_plot == T) {
+  knitr::include_graphics(paste("missing_exon_set_position", FIGURE_EXT, sep = "."))
+ } else {
+  print("No missing exon sets found")  
+ }
+} else {
+ print("Missing element sets are not defined in single-transcriptome analyses")
+}
+```
+**Figure 24.**  Missing exon set position.
+<br>
+<br>
+
+```{r include=F}
+#Defining external arguments for annotation-based analysis
+if (PERFORM_ANNOT_ANALYSIS == F) {
+ knit_exit()
+}
+invisible(gc(full = T))
+GTF_DATA <- ext_args[, args][35]
+MIN_EX_SET_GTF_SET_OVL_PROP <- as.numeric(ext_args[, args][36])
+MIN_TR_SET_GTF_SET_OVL_PROP <- as.numeric(ext_args[, args][37])
+EL_SET_GTF_SET_OVL_PROP_BREAKS <- unlist(strsplit(ext_args[, args][38], ","))
+```
+
+### Annotation-based analysis
+
+```{r echo=F, message=F, warning=F}
+#Importing annotation data from file (GTF/GFF3)
+if (STRANDED == F) {
+ gtf_data <- fread(GTF_DATA, header = F, select = c(1, 3 : 5))[V3 %chin% c("exon", "transcript")] 
+ setnames(gtf_data, c("scaff_name_gtf", "feature_type", "scaff_start_gtf", "scaff_end_gtf"))
+} else {
+ gtf_data <- fread(GTF_DATA, header = F, select = c(1, 3 : 5, 7))[V3 %chin% c("exon", "transcript")] 
+ setnames(gtf_data, c("scaff_name_gtf", "feature_type", "scaff_start_gtf", "scaff_end_gtf", "scaff_strand_gtf"))
+ gtf_data[, "scaff_name_gtf" := paste0(scaff_name_gtf, scaff_strand_gtf)]
+ gtf_data[, "scaff_strand_gtf" := NULL]
+}
+
+if (gtf_data[feature_type == "exon", .N] == 0) {
+ print("The provided GTF/GFF3 file does not contain exon records. Exiting without performing GTF analysis")
+ knit_exit()
+} else if (gtf_data[feature_type == "transcript", .N] == 0) {
+ print("The provided GTF/GFF3 file does not contain transcript records. Exiting without performing GTF analysis") 
+ knit_exit()
+}
+
+#Filtering GTF exons by length
+gtf_data <- gtf_data[abs(scaff_end_gtf - scaff_start_gtf) + 1 >= MIN_EX_LEN]
+if (gtf_data[, .N] == 0) {
+ print("None of the GTF exons remained after identity filtering. Exiting without GTF analysis")
+ knit_exit()
+}
+
+#Defining GTF exon sets
+gtf_exon_set_gr <- reduce(makeGRangesFromDataFrame(gtf_data[feature_type == "exon"], seqnames.field = "scaff_name_gtf", start.field = "scaff_start_gtf", end.field = "scaff_end_gtf", ignore.strand = T, keep.extra.columns = T), min.gapwidth = 0)
+gtf_exon_set_gr <- gtf_exon_set_gr[width(gtf_exon_set_gr) >= MIN_EX_SET_LEN]
+if (length(gtf_exon_set_gr) == 0) {
+ print("None of the GTF exon sets remained after identity filtering. Exiting without GTF analysis")
+ knit_exit()
+}
+gtf_exon_set_gr <- gtf_exon_set_gr[order(-width(gtf_exon_set_gr))]
+mcols(gtf_exon_set_gr)$gtf_set_id <- 1 : length(gtf_exon_set_gr)
+
+#Defining GTF transcript sets
+gtf_transcript_set_gr <- reduce(makeGRangesFromDataFrame(gtf_data[feature_type == "transcript"], seqnames.field = "scaff_name_gtf", start.field = "scaff_start_gtf", end.field = "scaff_end_gtf", ignore.strand = T, keep.extra.columns = F), min.gapwidth = 0)
+rm(gtf_data)
+gtf_transcript_set_gr <- gtf_transcript_set_gr[width(gtf_transcript_set_gr) >= MIN_TR_SET_LEN & width(gtf_transcript_set_gr) <= MAX_TR_SET_LEN]
+if (length(gtf_transcript_set_gr) == 0) {
+ print("None of the GTF transcript sets remained after identity filtering. Exiting without GTF analysis")
+ knit_exit()
+}
+gtf_transcript_set_gr <- gtf_transcript_set_gr[order(-width(gtf_transcript_set_gr))]
+mcols(gtf_transcript_set_gr)$gtf_set_id <- 1 : length(gtf_transcript_set_gr)
+
+#Performing annotation-based exon set analysis
+ex_set_annot_comparison_results <- compare_element_set_annot("exon set")
+if(is.null(ex_set_annot_comparison_results)) {
+ print("None of the analysed exon sets overlap with GTF exon sets. Exiting without GTF analysis")
+ knit_exit()
+}
+rm(exon_set_gr, exon_set_comp_N, gtf_exon_set_gr)
+
+#Adding exon set precision and recall
+annot_analysis_stats <- rbindlist(list(exon_set_comp_prop, ex_set_annot_comparison_results[[1]], as.list(ex_set_annot_comparison_results[[2]])))
+ex_set_annot_comparison_results[[1]] <- NULL
+ex_set_annot_comparison_results[[1]] <- NULL
+
+#Adding the proportion of covered transcriptome exon sets by a GTF exon set
+annot_analysis_stats <- rbindlist(list(annot_analysis_stats, as.list(ex_set_annot_comparison_results[[1]])))
+ex_set_annot_comparison_results[[1]] <- NULL
+
+#Adding annotation-based exon score
+annot_analysis_stats <- rbindlist(list(annot_analysis_stats, as.list(ex_set_annot_comparison_results[[1]])))
+ex_set_annot_comparison_results[[1]] <- NULL
+
+#Performing annotation-based transcript set analysis
+tr_set_annot_comparison_results <- compare_element_set_annot("transcript set")
+if(is.null(tr_set_annot_comparison_results)) {
+ print("None of the analysed transcript sets overlap with GTF transcript sets. Exiting without GTF analysis")
+ knit_exit()
+}
+rm(transcript_set_gr, transcript_set_comp_N, gtf_transcript_set_gr)
+annot_analysis_stats <- rbindlist(list(annot_analysis_stats, transcript_set_comp_prop))
+
+#Adding transcript set precision and recall
+annot_analysis_stats <- rbindlist(list(annot_analysis_stats, tr_set_annot_comparison_results[[1]], as.list(tr_set_annot_comparison_results[[2]])))
+tr_set_annot_comparison_results[[1]] <- NULL
+tr_set_annot_comparison_results[[1]] <- NULL
+
+#Adding the proportion of covered transcriptome transcript sets by a GTF transcript set
+annot_analysis_stats <- rbindlist(list(annot_analysis_stats, as.list(tr_set_annot_comparison_results[[1]])))
+tr_set_annot_comparison_results[[1]] <- NULL
+
+#Adding annotation-based transcript score
+annot_analysis_stats <- rbindlist(list(annot_analysis_stats, as.list(tr_set_annot_comparison_results[[1]])))
+tr_set_annot_comparison_results[[1]] <- NULL
+
+#Generating annotation-based statistics
+annot_analysis_stat_params <- c("N, % exon sets included in completeness analyses", "N, % matched transcriptome assembly exon sets (exon set precision)", "N, % matched GTF exon sets (exon set recall)", "Proprtion of covered transcriptome assembly exon sets (mean, IQR)", "Annotation-based exon score", "N, % transcript sets included in completeness analyses", "N, % matched transcriptome assembly transcript sets (transcript set precision)", "N, % matched GTF transcript sets (transcript set recall)","Proprtion of covered transcriptome assembly transcript sets (mean, IQR)", "Annotation-based transcript score")
+annot_analysis_stats <- cbind(annot_analysis_stat_params, annot_analysis_stats)
+rm(annot_analysis_stat_params)
+colnames(annot_analysis_stats) <- c("Parameter", transcriptome_names)
+
+#Writing annotation-based statistics to file
+write.table(annot_analysis_stats, file = "CATS_rb_annotation_based_analysis_results.tsv", sep = "\t", row.names = F, col.names = T, quote = F)
+```
+
+**Table 5.** Annotation-based statistics.
+
+```{r echo=F, message=F, warning=F, fig.align='center', results="asis"}
+#Displaying the annotation-based statistics kable
+display_kable(annot_analysis_stats)
+rm(annot_analysis_stats)
+```
+IQR = interquartile range
+<br>
+<br>
+
+```{r echo=F, message=F, warning=F, fig.align='center', fig.height=5, fig.width=`BP_BP3_WIDTH`}
+#Displaying the proportion of covered transcriptome exon sets by a GTF exon set category barplot
+knitr::include_graphics(paste("prop_of_exon_set_covered_by_a_gtf_set", FIGURE_EXT, sep = "."))
+```
+**Figure 25.** Proprtion of covered transcriptome exon sets by a GTF exon set category distribution.
+<br>
+<br>
+
+**Annotation-based exon set UpSet plot**
+```{r echo=F, message=F, warning=F, fig.align='center', fig.height=`UP_HEIGHT`}
+#Displaying the annotation-based exon set UpSet plot
+if (TRANSCRIPTOME_N > 1) {
+ if (is.null(ex_set_annot_comparison_results[[1]]) == F) {
+  ex_set_annot_comparison_results[[1]] 
+ } else {
+  print("All GTF exon sets were found in all of the analysed transcriptome assemblies - exon set UpSet plots are not shown") 
+ }
+} else {
+ print("UpSet plots are not defined in single-transcriptome analyses")
+}
+if (TRANSCRIPTOME_N > 1) {
+ ex_set_annot_comparison_results[[1]] <- NULL
+}
+```
+**Figure 26.**  Annotation-based exon set UpSet plot.
+<br>
+<br>
+
+**Annotation-based pairwise exon set Venn diagrams**
+```{r echo=F, message=F, warning=F, fig.align='center', fig.height=`WD_HEIGHT_WIDTH`, fig.width=`WD_HEIGHT_WIDTH`}
+#Displaying the annotation-based pairwise exon set Venn diagrams
+if (TRANSCRIPTOME_N > 1 & TRANSCRIPTOME_N <= 10)  {
+ knitr::include_graphics(paste("annotation_based_pairwise_exon_set_venn_diagrams", FIGURE_EXT, sep = "."))
+} else {
+ print("Venn diagrams are not shown when N(transcriptomes) > 10 or in single-transcriptome analyses")
+}
+```
+**Figure 27.**  Annotation-based pairwise exon set Venn diagrams.
+<br>
+<br>
+
+```{r echo=F, message=F, warning=F, fig.align='center', fig.height=`HP_HEIGHT`, fig.width=`HP_WIDTH`}
+#Displaying the annotation-based exon set hierarchical clustering heatmap
+if (TRANSCRIPTOME_N > 1) {
+ if (is.null(ex_set_annot_comparison_results[[1]]) == F) {
+  ex_set_annot_comparison_results[[1]]
+ } else {
+  print("Exon set hierarchical clustering heatmap is not defined in the event of all analysed transcriptome assemblies containing identical exon sets")
+ }
+} else {
+ print("Hierarchical clustering heatmap is not defined in single-transcriptome analyses") 
+}
+if (TRANSCRIPTOME_N > 1) {
+ ex_set_annot_comparison_results[[1]] <- NULL
+}
+```
+**Figure 28.**  Annotation-based exon set hierarchical clustering heatmap.
+<br>
+<br>
+
+```{r echo=F, message=F, warning=F, fig.align='center', fig.height=5, fig.width=`BP_BP3_WIDTH`}
+#Displaying the proportion of covered transcriptome transcript sets by a GTF transcript set category barplot
+knitr::include_graphics(paste("prop_of_transcript_set_covered_by_a_gtf_set", FIGURE_EXT, sep = "."))
+```
+**Figure 29.** Proportion of covered transcriptome transcript sets by a GTF transcript set category distribution.
+<br>
+<br>
+
+**Annotation-based transcript set UpSet plot**
+```{r echo=F, message=F, warning=F, fig.align='center', fig.height=`UP_HEIGHT`}
+#Displaying the annotation-based transcript set UpSet plot
+if (TRANSCRIPTOME_N > 1) {
+ if (is.null(tr_set_annot_comparison_results[[1]]) == F) {
+  tr_set_annot_comparison_results[[1]] 
+ } else {
+  print("All GTF transcript sets were found in all of the analysed transcriptome assemblies - transcript set UpSet plots are not shown")
+ }
+} else {
+ print("UpSet plots are not defined in single-transcriptome analyses")
+}
+if (TRANSCRIPTOME_N > 1) {
+ tr_set_annot_comparison_results[[1]] <- NULL
+}
+```
+**Figure 30.**  Annotation-based transcript set UpSet plot.
+<br>
+<br>
+
+**Annotation-based pairwise transcript set Venn diagrams**
+```{r echo=F, message=F, warning=F, fig.align='center', fig.height=`WD_HEIGHT_WIDTH`, fig.width=`WD_HEIGHT_WIDTH`}
+#Displaying the annotation-based pairwise transcript set Venn diagrams
+if (TRANSCRIPTOME_N > 1 & TRANSCRIPTOME_N <= 10)  {
+ knitr::include_graphics(paste("annotation_based_pairwise_transcript_set_venn_diagrams", FIGURE_EXT, sep = "."))
+} else {
+ print("Venn diagrams are not shown when N(transcriptomes) > 10 or in single-transcriptome analyses")
+}
+```
+**Figure 31.** Annotation-based pairwise transcript set Venn diagrams.
+<br>
+<br>
+
+```{r echo=F, message=F, warning=F, fig.align='center', fig.height=`HP_HEIGHT`, fig.width=`HP_WIDTH`}
+#Displaying the annotation-based transcript set hierarchical clustering heatmap
+if (TRANSCRIPTOME_N > 1) {
+ if (is.null(tr_set_annot_comparison_results[[1]]) == F) {
+  tr_set_annot_comparison_results[[1]]
+ } else {
+  print("Transcript set hierarchical clustering heatmap is not defined in the event of all analysed transcriptome assemblies containing identical transcript sets")
+ }
+} else {
+ print("Hierarchical clustering heatmap is not defined in single-transcriptome analyses") 
+}
+```
+**Figure 32.**  Annotation-based transcript set hierarchical clustering heatmap.

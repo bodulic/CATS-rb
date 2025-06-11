@@ -1,0 +1,451 @@
+#!/bin/bash
+#Defining usage and exiting (function)
+usage () {
+ echo "CATS-rb version 1.0.0 - transcriptome assembly comparison script" >&2
+ echo "USAGE ${0} [OPTIONS] GENOME TRANSCRIPTOME_MAP_DIR ..." >&2
+ echo "Mapping comparison options:" >&2
+ echo "-S: Enable stranded analysis, default: off" >&2
+ echo "-p: Minimum exon identity proportion, default: 0.98" >&2
+ echo "-e: Minimum exon length (in bp), default: 20 bp" >&2
+ echo "-i: Maximum intron length (in bp), default: 100000 bp" >&2
+ echo "-M: Alignment proportion threshold for structural inconsistency detection, default: 0.9" >&2
+ echo "-C: Maximum proportion of allowed transcript segment overlap for identification of segments mapping to different genomic regions, default: 0.3" >&2
+ echo "-l: Minimum exon set length for completeness analysis (in bp), default: 0 bp" >&2
+ echo "-L: Minimum transcript set length for completeness analysis (in bp), default: 100 bp" >&2
+ echo "-m: Maximum transcript set length for completeness analysis (in bp), default: 1000000 bp" >&2
+ echo "-j: Minimum overlap between exon sets for edge specification (in bp), default: 1 bp" >&2
+ echo "-J: Minimum overlap between transcript sets for edge specification (in bp), default: 1 bp" >&2
+ echo "-o: Minimum overlap between transcript set and transcript for isoform specification (in bp), default: 1 bp" >&2
+ echo "-P: Transcript set proximity region length for unique exon set analysis (in bp), default: 5000 bp" >&2
+ echo "-x: Figure extension, default: png" >&2
+ echo "-d: Figure DPI, default: 300" >&2
+ echo "-r: Raincloud plot colors (quoted hexadecimal codes or R color names, specified with x,y,z...), default: adjusted Set1 palette from the RColorBrewer package" >&2
+ echo "-b: Barplot colors (quoted hexadecimal codes or R color names, specified with x,y,z...), default: adjusted YlOrRd palette from the RColorBrewer package" >&2
+ echo "-n: Exon set genomic location plot colors (quoted hexadecimal codes or R color names, specified with x,y,z...), default: adjusted Set1 palette from the RColorBrewer package" >&2
+ echo "-u: UpSet plot bar and matrix colors (quoted hexadecimal codes or R color names, specified with x,y,z...), default: #FDAF4A,#DC151D" >&2
+ echo "-v: Venn diagram colors (quoted hexadecimal codes or R color names, specified with x,y,z...), default: adjusted Reds palette from the RColorBrewer package" >&2
+ echo "-y: Pairwise similarity tileplot colors (quoted hexadecimal codes or R color names, specified with x,y,z...), default: adjusted YlOrRd palette from the RColorBrewer package" >&2
+ echo "-c: Hierarchical clustering heatmap colors (quoted hexadecimal codes or R color names, specified with x,y,z...), default: adjusted YlOrRd palette from the RColorBrewer package" >&2
+ echo "-q: Maximum right-tail distribution quantile for raincloud plots, default: 0.995" >&2
+ echo "-f: Number of longest genomic scaffolds for genomic location plotting of exon sets, default: all scaffolds" >&2
+ echo "-B: Number of genomic bins for genomic location plotting of exon sets, default: 50000" >&2
+ echo "-V: Minimum overlap proportion for an element set to be assigned to a Venn set, default: 0.35" >&2
+ echo "-H: Number of longest element sets used in hierarchical clustering, default: 5000" >&2
+ echo "-E: Use raster for heatmap plotting, default: off" >&2
+ echo "-A: Proportion of aligned transcript distribution breakpoints (specified with x,y,z...), default: 0,0.1,0.3,0.5,0.7,0.9,0.95,1" >&2
+ echo "-N: Number of exons per transcript distribution breakpoints (specified with x,y,z...), default: 0,2,4,6,8,10,15,20" >&2
+ echo "-R: Common element set relative length distribution breakpoints (specified with x,y,z...), default: 0,0.1,0.3,0.5,0.7,0.9,0.95,1" >&2
+ echo "-I: Number of isoforms per transcript set distribution breakpoints (specified with x,y,z...), default: 0,2,4,6,8,10,15,20" >&2
+ echo "Annotation-based analysis options (requires a GTF/GFF3 file to be supplied):" >&2
+ echo "-F: GTF/GFF3 file for the annotation-based analysis" >&2
+ echo "-g: Minimum proportion of an exon set that must be covered to be considered a match to a GTF exon set (and vice versa); default: 0.35" >&2
+ echo "-G: Minimum proportion of a transcript set that must be covered to be considered a match to a GTF transcript set (and vice versa); default: 0.35" >&2
+ echo "-s: Proportion of element sets covered by a GTF set distribution breakpoints (specified with x,y,z...), default: 0,0.1,0.3,0.5,0.7,0.9,0.95,1" >&2
+ echo "General options:" >&2
+ echo "-t: Number of CPU threads, default: 10" >&2
+ echo "-D: Comparison results directory name, default: CATS_rb_comparison" >&2
+ echo "-O: Overwrite the comparison output directory, default: off" >&2
+ echo "-h: Show usage information" >&2
+ exit 1
+}
+
+#Addingg date and time to log messages (function)
+write_log () {
+ local LOG_TYPE="${1}"
+ shift 1
+ local MESSAGE="${*}"
+ echo "$(date '+%d/%m/%Y %H:%M:%S'):${LOG_TYPE}: ${MESSAGE}" >&2
+}
+
+#Checking executables (function)
+check_executable () {
+ for EXECUTABLE in "${@}"
+ do
+  if ! [[ -x $(command -v "${EXECUTABLE}") ]]
+  then
+   write_log ERROR "${EXECUTABLE} could not be found. Please check the supplied path"
+   exit 1
+  fi
+ done
+}
+
+#Checking the supplied files (function)
+check_files() {
+ for FILE in "${@}"
+ do
+  if [[ -f "${FILE}" ]]
+  then
+   if ! [[ -s "${FILE}" ]]
+   then
+    write_log ERROR "${FILE} is empty"
+    exit 1
+   fi
+  else
+   write_log ERROR "${FILE} cannot be found (or is not a file). Please check the supplied path"
+   exit 1
+  fi
+ done
+}
+
+#Checking the supplied directories (function)
+check_directories() {
+ for DIRECTORY in "${@}"
+ do
+  if [[ -d "${DIRECTORY}" ]]
+  then
+   if [[ -z $(ls "${DIRECTORY}") ]]
+   then
+    write_log ERROR "${DIRECTORY} is empty"
+    exit 1
+   fi
+  else
+   write_log ERROR "${DIRECTORY} cannot be found (or is not a directory). Please check the supplied path"
+   exit 1
+  fi
+ done
+}
+
+#Checking the exit status of the last command (function)
+check_exit_status () {
+ local EXIT_STATUS="${?}"
+ local MESSAGE="${*}"
+ if [[ "${EXIT_STATUS}" -ne 0 ]]
+ then
+  write_log ERROR "${MESSAGE}"
+  exit 1
+ fi
+}
+
+#Testing numerical arguments (function)
+test_numeric_arg () {
+ local NUM_REGEX='^[0-9]+(\.[0-9]+)?$'
+ local NUMERIC_ARG="${1}"
+ local VAR_NAME="${2}"
+ local ARG_DEF_VALUE="${3}"
+ shift 3
+ local MESSAGE="${*}"
+ if [[ -n "${NUMERIC_ARG}" && ! "${NUMERIC_ARG}" =~ ${NUM_REGEX} ]]
+ then
+  export "${VAR_NAME}"="${ARG_DEF_VALUE}"
+  write_log WARNING "${MESSAGE}"
+ fi
+}
+
+#Defining default parameters
+STRANDED="F"
+MIN_EX_ID_PROP=0.98
+MIN_EX_LEN=20
+MAX_INT_LEN=100000
+STR_INC_ALN_PROP=0.9
+STR_INC_MAX_OVL_PROP=0.3
+MIN_EX_SET_LEN=0
+MIN_TR_SET_LEN=100
+MAX_TR_SET_LEN=1000000
+MIN_EX_SET_OVL=1
+MIN_TR_SET_OVL=1
+MIN_ISO_OVL=1
+TR_SET_PROX_LEN=5000
+FIGURE_EXT="png"
+FIGURE_DPI=300
+RP_COLORS="#E41A1C,#377EB8,#4DAF4A,#984EA3,#FF7F00,#A65628,#F781BF,#999999"
+BP_COLORS="#FFEDA0,#FED976,#FEB24C,#FD8D3C,#FC4E2A,#E31A1C,#BD0026"
+GP_COLORS="#E41A1C,#377EB8,#4DAF4A,#984EA3,#FF7F00,#A65628,#F781BF,#999999"
+UP_COLORS="#FDAF4A,#DC151D"
+VD_COLORS="#FFF5F0,#FEE0D2,#FCBBA1,#FC9272,#FB6A4A,#EF3B2C,#CB181D,#A50F15"
+TP_COLORS="#FFEDA0,#FED976,#FEB24C,#FD8D3C,#FC4E2A,#E31A1C,#BD0026"
+HP_COLORS="#FFEDA0,#FED976,#FEB24C,#FD8D3C,#FC4E2A,#E31A1C,#BD0026"
+RP_MAX_QUANTILE=0.995
+GENOMIC_BIN_N=50000
+VD_MIN_OVL_PROP=0.35
+HP_EL_N=5000
+HP_RASTER="F"
+TR_ALN_PROP_BREAKS="0,0.1,0.3,0.5,0.7,0.9,0.95,1"
+EXON_PER_TR_N_BREAKS="0,2,4,6,8,10,15,20"
+COMM_EL_SET_REL_BREAKS="0,0.1,0.3,0.5,0.7,0.9,0.95,1"
+ISO_N_BREAKS="0,2,4,6,8,10,15,20"
+MIN_EX_SET_GTF_SET_OVL_PROP=0.35
+MIN_TR_SET_GTF_SET_OVL_PROP=0.35
+EL_SET_GTF_SET_OVL_PROP_BREAKS="0,0.1,0.3,0.5,0.7,0.9,0.95,1"
+THREAD_N=10
+OUT_DIR="CATS_rb_comparison"
+OVERWRITE_RES="F"
+
+#Saving the script call
+CALL="$(echo "${0} ${@}")"
+
+#Defining options
+while getopts ":Sp:e:i:M:C:l:L:m:j:J:o:P:x:d:r:b:n:u:v:y:c:q:f:B:V:H:EA:N:R:I:F:g:G:s:t:D:Oh" OPT; do
+ case ${OPT} in
+  S) STRANDED="T"
+     ;;
+  p) MIN_EX_ID_PROP="${OPTARG}"
+     ;;
+  e) MIN_EX_LEN="${OPTARG}"
+     ;;
+  i) MAX_INT_LEN="${OPTARG}"
+     ;;
+  M) STR_INC_ALN_PROP="${OPTARG}"
+     ;;
+  C) STR_INC_MAX_OVL_PROP="${OPTARG}"
+     ;;
+  l) MIN_EX_SET_LEN="${OPTARG}"
+     ;;
+  L) MIN_TR_SET_LEN="${OPTARG}"
+     ;;
+  m) MAX_TR_SET_LEN="${OPTARG}"
+     ;;
+  j) MIN_EX_SET_OVL="${OPTARG}"
+     ;;
+  J) MIN_TR_SET_OVL="${OPTARG}"
+     ;;
+  o) MIN_ISO_OVL="${OPTARG}"
+     ;;
+  P) TR_SET_PROX_LEN="${OPTARG}"
+     ;;
+  x) FIGURE_EXT="${OPTARG}"
+     ;;
+  d) FIGURE_DPI="${OPTARG}"
+     ;;
+  r) RP_COLORS="${OPTARG}"
+     ;;
+  b) BP_COLORS="${OPTARG}"
+     ;;
+  n) GP_COLORS="${OPTARG}"
+     ;;
+  u) UP_COLORS="${OPTARG}"
+     ;;
+  v) VD_COLORS="${OPTARG}"
+     ;;
+  y) TP_COLORS="${OPTARG}"
+     ;;
+  c) HP_COLORS="${OPTARG}"
+     ;;
+  q) RP_MAX_QUANTILE="${OPTARG}"
+     ;;
+  f) LONGEST_SCAFF_N="${OPTARG}"
+     ;;
+  B) GENOMIC_BIN_N="${OPTARG}"
+     ;;
+  V) VD_MIN_OVL_PROP="${OPTARG}"
+     ;;
+  H) HP_EL_N="${OPTARG}"
+     ;;
+  E) HP_RASTER="T"
+     ;;
+  A) TR_ALN_PROP_BREAKS="${OPTARG}"
+     ;;
+  N) EXON_PER_TR_N_BREAKS="${OPTARG}"
+     ;;
+  R) COMM_EL_SET_REL_BREAKS="${OPTARG}"
+     ;;
+  I) ISO_N_BREAKS="${OPTARG}"
+     ;;
+  F) GTF_DATA="${OPTARG}"
+     ;;
+  g) MIN_EX_SET_GTF_SET_OVL_PROP="${OPTARG}"
+     ;;
+  G) MIN_TR_SET_GTF_SET_OVL_PROP="${OPTARG}"
+     ;;
+  s) EL_SET_GTF_SET_OVL_PROP_BREAKS="${OPTARG}"
+     ;;
+  t) THREAD_N="${OPTARG}"
+     ;;
+  D) OUT_DIR="${OPTARG}"
+     ;;
+  O) OVERWRITE_RES="T"
+     ;;
+  h) usage
+     ;;
+  ?) write_log ERROR "Unknown flag supplied: -${OPTARG}"
+     usage
+     ;;
+ esac
+done
+shift "$(( OPTIND - 1 ))"
+
+#Displaying usage when calling the script without arguments
+if [[ "${#}" -eq 0 ]]
+then
+ usage
+fi
+
+#Save log output to file and STDERR
+LOG_FILE="CATS_rb_compare_run_$(date '+%Y%m%d_%H%M%S')"
+exec 3>&2
+exec 2> >(tee "$LOG_FILE" >&3)
+
+#Printing welcome message
+echo "Welcome to CATS-rb reference-based transcriptome assembly comparison tool (version 1.0.0). Find us on www.github.com/kbodulic.com"
+
+#Checking executable requirements
+check_executable Rscript
+
+#Checking if the correct number of files / directories is supplied
+if [[ "${#}" -lt 2 ]]
+then
+ write_log ERROR "Invalid number of files / directories supplied"
+ exit 1
+fi
+
+#Assigning positional arguments
+GENOME="${1}"
+
+#Checking the supplied files and directories
+check_files "${GENOME}"
+shift
+check_directories "${@}"
+
+#Checking the supplied GTF/GFF3 file
+if [[ -n "${GTF_DATA}" ]]
+then
+ check_files "${GTF_DATA}"
+fi
+
+#Checking the overwrite argument
+if [[ -d "${OUT_DIR}" || -f "${OUT_DIR}" ]]
+then
+ if [[ "${OVERWRITE_RES}" = "F" ]]
+ then
+  write_log ERROR "The comparison output directory already exists and the overwrite option is turned off"
+  exit 1
+ elif [[ "${OVERWRITE_RES}" = "T" ]]
+ then
+  rm -r "${OUT_DIR}"
+ fi
+fi
+
+#Testing numerical arguments
+test_numeric_arg "${MIN_EX_ID_PROP}" "MIN_EX_ID_PROP" 0.98 "Supplied an incorrect value for the minimum exon identity proportion, defaulting to 0.98"
+test_numeric_arg "${MIN_EX_LEN}" "MIN_EX_LEN" 20 "Supplied an incorrect value for the minimum exon length, defaulting to 20 bp"
+test_numeric_arg "${MAX_INT_LEN}" "MAX_INT_LEN" 100000 "Supplied an incorrect value for the maximum intron length, defaulting to 100000 bp"
+test_numeric_arg "${STR_INC_ALN_PROP}" "STR_INC_ALN_PROP" 0.9 "Supplied an incorrect value for the alignment proportion threshold for structural inconsistency detection, defaulting to 0.9"
+test_numeric_arg "${STR_INC_MAX_OVL_PROP}" "STR_INC_MAX_OVL_PROP" 0.3 "Supplied an incorrect value for the maximum proportion of allowed transcript segment overlap for identification of segments mapping to different genomic regions, defaulting to 0.3"
+test_numeric_arg "${MIN_EX_SET_LEN}" "MIN_EX_SET_LEN" 0 "Supplied an incorrect value for the minimum exon set length for completeness analysis, defaulting to 0 bp"
+test_numeric_arg "${MIN_TR_SET_LEN}" "MIN_TR_SET_LEN" 100 "Supplied an incorrect value for the minimum transcript set length for completeness analysis, defaulting to 100 bp"
+test_numeric_arg "${MAX_TR_SET_LEN}" "MAX_TR_SET_LEN" 1000000 "Supplied an incorrect value for the maximum transcript set length for completeness analysis, defaulting to 1000000 bp"
+test_numeric_arg "${MIN_EX_SET_OVL}" "MIN_EX_SET_OVL" 1 "Supplied an incorrect value for the minimum overlap between exon sets for edge specification, defaulting to 1 bp"
+test_numeric_arg "${MIN_TR_SET_OVL}" "MIN_TR_SET_OVL" 1 "Supplied an incorrect value for minimum overlap between transcript sets for edge specification, defaulting to 1 bp"
+test_numeric_arg "${MIN_ISO_OVL}" "MIN_ISO_OVL" 1 "Supplied an incorrect value for the minimum overlap between transcript set and transcript for isoform specification, defaulting to 1 bp"
+test_numeric_arg "${TR_SET_PROX_LEN}" "TR_SET_PROX_LEN" 5000 "Supplied an incorrect value for the transcript set proximity region length for unique exon set analysis, defaulting to 5000 bp"
+test_numeric_arg "${FIGURE_DPI}" "FIGURE_DPI" 300 "Supplied an incorrect value for figure DPI, defaulting to 300"
+test_numeric_arg "${RP_MAX_QUANTILE}" "RP_MAX_QUANTILE" 0.995 "Supplied an incorrect value for the maximum right-tail distribution quantile for raincloud plots, defaulting to 0.995"
+test_numeric_arg "${LONGEST_SCAFF_N}" "LONGEST_SCAFF_N" "" "Supplied an incorrect value for the number of longest genomic scaffolds for genomic location plotting of exon sets, defaulting to all scaffolds"
+test_numeric_arg "${GENOMIC_BIN_N}" "GENOMIC_BIN_N" 50000 "Supplied an incorrect value for the number of genomic bins for genomic location plotting of exon sets, defaulting to 50000"
+test_numeric_arg "${VD_MIN_OVL_PROP}" "VD_MIN_OVL_PROP" 0.35 "Supplied an incorrect value for the minimum overlap proportion for an element set to be assigned to a Venn set, defaulting to 0.35"
+test_numeric_arg "${HP_EL_N}" "HP_EL_N" 5000 "Supplied an incorrect value for the number of longest element sets used in hierarchical clustering, defaulting to 5000"
+test_numeric_arg "${THREAD_N}" "THREAD_N" 10 "Supplied an incorrect value for the number of CPU threads, defaulting to 10"
+
+#Testing numerical arguments (annotatoion-based analysis)
+if [[ -n "${GTF_DATA}" ]]
+then
+ test_numeric_arg "${MIN_EX_SET_GTF_SET_OVL_PROP}" "MIN_EX_SET_GTF_SET_OVL_PROP" 0.35 "Supplied an incorrect value for the minimum proportion of an exon set that must be covered to be considered a match to a GTF exon set, defaulting to 0.35"
+ test_numeric_arg "${MIN_TR_SET_GTF_SET_OVL_PROP}" "MIN_TR_SET_GTF_SET_OVL_PROP" 0.35 "Supplied an incorrect value for the minimum proportion of a transcript set that must be covered to be considered a match to a GTF transcript set, defaulting to 0.35"
+fi
+
+#Checking the FIGURE_EXT argument
+if [[ ! "${FIGURE_EXT}" =~ ^(bmp|eps|jpeg|jpg|pdf|png|ps|svg|tex|tiff)$ ]]
+then
+ write_log WARNING "Unsupported figure extension. Defaulting to png"
+ FIGURE_EXT="png"
+fi
+
+#Checking the RP_MAX_QUANTILE argument
+if awk -v num="${RP_MAX_QUANTILE}" 'BEGIN {exit !(num > 1)}'
+then
+ write_log WARNING "Maximum right-tail distribution quantile for raincloud plots should not exceed 1. Defaulting to 1"
+ RP_MAX_QUANTILE=1
+fi
+
+#Checking the HP_EL_N argument
+if [[ "${HP_EL_N}" -gt 65000 ]]
+then
+ write_log WARNING "The number of longest element sets used in hierarchical clustering should not exceed 65000. Defaulting to 65000"
+ HP_EL_N=65000
+fi
+
+#Creating output directory
+mkdir "${OUT_DIR}"
+check_exit_status "Creating output directory failed"
+
+#Creating symbolic links
+ln -s -r -t "${OUT_DIR}" "${GENOME}"
+GENOME="$(basename "${GENOME}")"
+
+#Creating a symbolic link for the GTF/GFF3 file
+if [[ -n "${GTF_DATA}" ]]
+then
+ ln -s -r -t "${OUT_DIR}" "${GTF_DATA}"
+ GTF_DATA="$(basename "${GTF_DATA}")"
+fi
+cd "${OUT_DIR}"
+
+#Writing the script call to file
+echo "${CALL}" > call.log
+
+#Preparing transcriptome asssembly mapping files for comparison
+write_log INFO "Preparing transcriptome assembly mapping files for comparison"
+FILE_PATTERNS=("mapped.tsv" "general_statistics_table.tsv" "lengths.tsv")
+COUNTER=1
+for DIRECTORY in "${@}"
+do
+ ln -s -r "../${DIRECTORY}"
+ DIRECTORY="$(basename "${DIRECTORY}")"
+ mkdir "${DIRECTORY}_tmpdir"
+ cd "${DIRECTORY}_tmpdir"
+ for FILE_PATTERN in "${FILE_PATTERNS[@]}"
+ do
+  TARGET_FILE=$(eval echo "../${DIRECTORY}"/*"${FILE_PATTERN}")
+  if ls ${TARGET_FILE} >/dev/null 2>&1
+  then
+   cp ${TARGET_FILE} "${COUNTER}%$(basename "${TARGET_FILE}")"
+  else
+   write_log ERROR "The required CATS-rb file ${FILE_PATTERN} is missing in ${DIRECTORY}. Please re-run the CATS-rb transcriptome assembly mapping script"
+   exit 1
+  fi
+ done
+ cd ..
+ rm "${DIRECTORY}"
+ mv "${DIRECTORY}_tmpdir/"* .
+ rm -r "${DIRECTORY}_tmpdir"
+ ((COUNTER=COUNTER+1))
+done
+
+#Calculating genomic scaffold lengths
+write_log INFO "Calculating genomic scaffold lengths"
+sed -r 's/^(>\S+)\s.*/\1/' "${GENOME}" > "${GENOME}_onew_h"
+rm "${GENOME}"
+awk '/^>/ { if (seq) print name "\t" length(seq); name = substr($0, 2); seq = ""; next } { seq = seq $0 } END { print name "\t" length(seq) }' "${GENOME}_onew_h" > scaff_lengths && rm "${GENOME}_onew_h"
+
+#Setting the number of longest genomic scaffolds for genomic location plotting of exon sets
+if [[ -z "${LONGEST_SCAFF_N}" ]]
+then
+ LONGEST_SCAFF_N=$(wc -l scaff_lengths | cut -d ' ' -f 1)
+fi
+
+#Preparing for transcriptome assembly comparison
+if [[ -n "${GTF_DATA}" ]]
+then
+ write_log INFO "Comparing transcriptome assemblies, annotation-based analysis: on"
+ PERFORM_ANNOT_ANALYSIS="T"
+ echo -e "args\n${THREAD_N}\n${RP_MAX_QUANTILE}\n${RP_COLORS}\n${FIGURE_EXT}\n${FIGURE_DPI}\n${BP_COLORS}\n${VD_MIN_OVL_PROP}\n${VD_COLORS}\n${MIN_EX_SET_OVL}\n${MIN_TR_SET_OVL}\n${UP_COLORS}\n${COMM_EL_SET_REL_BREAKS}\n${TP_COLORS}\n${HP_EL_N}\n${HP_COLORS}\n${HP_RASTER}\n${GP_COLORS}\n${MIN_EX_ID_PROP}\n${MIN_EX_LEN}\n${STRANDED}\n${MAX_INT_LEN}\n${TR_ALN_PROP_BREAKS}\n${STR_INC_ALN_PROP}\n${STR_INC_MAX_OVL_PROP}\n${EXON_PER_TR_N_BREAKS}\n${LONGEST_SCAFF_N}\n${GENOMIC_BIN_N}\n${MIN_EX_SET_LEN}\n${MIN_ISO_OVL}\n${ISO_N_BREAKS}\n${TR_SET_PROX_LEN}\n${MIN_TR_SET_LEN}\n${MAX_TR_SET_LEN}\n${PERFORM_ANNOT_ANALYSIS}\n${GTF_DATA}\n${MIN_EX_SET_GTF_SET_OVL_PROP}\n${MIN_TR_SET_GTF_SET_OVL_PROP}\n${EL_SET_GTF_SET_OVL_PROP_BREAKS}" > ext_args
+else
+ write_log INFO "Comparing transcriptome assemblies, annotation-based analysis: off"
+ PERFORM_ANNOT_ANALYSIS="F"
+ echo -e "args\n${THREAD_N}\n${RP_MAX_QUANTILE}\n${RP_COLORS}\n${FIGURE_EXT}\n${FIGURE_DPI}\n${BP_COLORS}\n${VD_MIN_OVL_PROP}\n${VD_COLORS}\n${MIN_EX_SET_OVL}\n${MIN_TR_SET_OVL}\n${UP_COLORS}\n${COMM_EL_SET_REL_BREAKS}\n${TP_COLORS}\n${HP_EL_N}\n${HP_COLORS}\n${HP_RASTER}\n${GP_COLORS}\n${MIN_EX_ID_PROP}\n${MIN_EX_LEN}\n${STRANDED}\n${MAX_INT_LEN}\n${TR_ALN_PROP_BREAKS}\n${STR_INC_ALN_PROP}\n${STR_INC_MAX_OVL_PROP}\n${EXON_PER_TR_N_BREAKS}\n${LONGEST_SCAFF_N}\n${GENOMIC_BIN_N}\n${MIN_EX_SET_LEN}\n${MIN_ISO_OVL}\n${ISO_N_BREAKS}\n${TR_SET_PROX_LEN}\n${MIN_TR_SET_LEN}\n${MAX_TR_SET_LEN}\n${PERFORM_ANNOT_ANALYSIS}" > ext_args
+fi
+cp $(which CATS_rb_comparison.Rmd) .
+
+#Comparing transcriptome assemblies
+Rscript -e "rmarkdown::render(input='CATS_rb_comparison.Rmd',output_file='CATS_rb_comparison.html')"
+check_exit_status "Transcriptome assembly comparison failed"
+
+#Cleaning up
+rm *"mapped.tsv" *"general_statistics_table.tsv" *"lengths.tsv" scaff_lengths ext_args CATS_rb_comparison.Rmd
+if [[ -n "${GTF_DATA}" ]]
+then
+ rm "${GTF_DATA}"
+fi
+
+#Exiting
+write_log INFO "Thank you for using CATS-rb! The transcriptome assembly comparison results can be found in ${OUT_DIR}"
+exit 0
