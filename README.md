@@ -346,7 +346,7 @@ Several steps of CATS-rb are paralellized. This mainly includes operations perfo
 # Output explanation
 
 The analysis is summarized in the `CATS_rb_comparison.html` HTML file. 
-An example of the HTML output is provided [here](file)
+An example of the HTML output is provided [here](output_example.html)
 
 ## Summary tables
 
