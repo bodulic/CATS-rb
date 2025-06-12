@@ -265,7 +265,7 @@ Parameters `x` and `d` control the extension and DPI of each plotted figure. Not
 
 `-r`: Raincloud plot colors (quoted hexadecimal codes or R color names, specified with x,y,z...), default: adjusted Set1 palette from RColorBrewer package
 
-All color name options (parameters `r`, `b`, `n`, `u`, `v`, `y`, and `c`) should be given as R color names or hexadecimal codes separated with commas and enclosed in quotes (e.g. "#FDAF4A,#DC151D"). R colors cheatsheet is available [here](https://sites.stat.columbia.edu/tzheng/files/Rcolor.pdf)
+All color name options (parameters `r`, `b`, `n`, `u`, `v`, `y`, and `c`) should be given as R color names or hexadecimal codes separated with commas and enclosed in quotes (e.g. "#FDAF4A,#DC151D"). R color cheatsheet is available [here](https://sites.stat.columbia.edu/tzheng/files/Rcolor.pdf)
 
 `-b`: Barplot colors (quoted hexadecimal codes or R color names, specified with x,y,z...), default: adjusted YlOrRd palette from RColorBrewer package
 
