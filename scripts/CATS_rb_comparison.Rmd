@@ -858,7 +858,7 @@ setorder(tr_map_N, transcriptome, tr_name)
 write.table(tr_map_N, file = "transcript_mapped_N.tsv", sep = "\t", row.names = F, col.names = T, quote = F)
 rm(tr_map_N)
 
-#Structural inconsistency analysis - transcript segments mapping to different genomic regions
+#Structural inconsistency analysis - transcript segments mapping to disjunct genomic regions
 if (transcripts[map_N != 1, .N] != 0) {
  multimapped_tr <- transcripts[tr_name %chin% unique(transcripts[map_N > 1, tr_name]) & tr_name !="SRR33339778_IDB,trs,contig-60_0"]
  multimapped_tr_gr <- makeGRangesFromDataFrame(multimapped_tr, seqnames.field  = "tr_name", start.field = "tr_start", end.field = "tr_end", ignore.strand = T, keep.extra.columns = T)
@@ -914,8 +914,8 @@ if(STRANDED == F) {
  transcripts[, "scaff_name" := sub(".$", "", scaff_name)]
 }
 
-#Writing transcripts whose segments map to different genomic regions to file
-write.table(str_inc_gen_pos_tr, file = "transcripts_diff_genomic_region.tsv", sep = "\t", row.names = F, col.names = T, quote = F)
+#Writing transcripts whose segments map to disjunct genomic regions to file
+write.table(str_inc_gen_pos_tr, file = "transcripts_disjunct_genomic_region.tsv", sep = "\t", row.names = F, col.names = T, quote = F)
 
 #Merging structurally inconsistent transcripts
 str_inc_tr <- unique(rbindlist(list(unmapped_tr, str_inc_aln_prop_tr, str_inc_gen_pos_tr)))
