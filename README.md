@@ -432,7 +432,10 @@ CATS-rb also produces several .tsv files containing detailed per-transcript and 
 
 # Citation
 
-CATS is an academic software distributed under the MIT license. Copyright © 2025 Kristian Bodulić
+CATS is an academic software distributed under the MIT license. 
+
+Copyright © 2025 Kristian Bodulić
+
 if you use CATS, please cite the CATS preprint:
 
 (add reference)
