@@ -8,16 +8,16 @@ CATS-rb is the reference-based module of the CATS (Comprehensive Assessment of T
 
 The main contribution of CATS-rb is the transcriptome assembly completeness analysis, which can be performed in two settings: 
 
-- Relative completeness analysis: requires multiple transcriptome assemblies
-- Annotation-based completenes analysis; requires one or more transcriptome assemblies and a reference gene annotation
+- Relative completeness analysis: requires multiple (two or more) transcriptome assemblies
+- Annotation-based completenes analysis: requires one or more transcriptome assemblies and a reference gene annotation
 
-Completeness analysis introduces two types of assembly element sets as units for assembly comparison. Precisely, CATS-rb collapses overlapping exon and transcript genomic coordinates within a given assembly into non-redundant exon and transcript sets, respectively. Completeness of element sets is compared between the analysed assemblies by constructing an undirected graph in which vertices represent element sets and edges indicate overlaps between the corresponding sets of the compared assemblies. Overlapping element sets are grouped into connected components, with the longest set designated as the group representative.
+Completeness analysis introduces exon and transcript sets as units for assembly comparison, together denoted as element sets. Precisely, CATS-rb collapses overlapping exon and transcript genomic coordinates within a given assembly into non-redundant exon and transcript sets, respectively. Completeness of exon/transcript sets is compared between the analysed assemblies by constructing an undirected graph in which vertices represent exon/transcript sets and edges indicate overlaps between the corresponding sets of the compared assemblies. Overlapping exon/transcript sets are grouped into connected components, with the longest set designated as the group representative.
 
 Element set completeness is quantified by its relative length compared to the representative set. Relative exon and transcript scores for each transcriptome assembly are computed as the mean of exon and transcript set completeness. Alongside completeness scores, CATS-rb also provides an in-depth analysis of missing, common, and unique element sets.
 
 Additionally, CATS-rb can perform an annotation-based analysis using element sets derived from a GTF file. This workflow follows the same principles as relative completeness analysis, while grouping element sets based on overlaps with GTF sets. As such, GTF sets are considered the representative for each set group. Annotation-based exon and transcript scores are calculated analogously to relative exon and transcript scores, offering an absolute measure of assembly completeness.
 
-CATS-rb exon and transcript scores exhibit a strong correlation with assembly accuracy and completeness. Furthermore, relative and annotation-based scores display a strong correlation among assemblies with varying quality, enabling precise assembly quality assessment without strictly requiring reference annotation. 
+CATS-rb exon and transcript scores exhibit a strong correlation with transcriptome assembly quality. Furthermore, relative and annotation-based scores display a strong correlation among assemblies with varying quality, enabling precise assembly quality assessment without strictly requiring reference annotation. 
 
 For detailed benchmarks and methodology, please refer to the CATS [preprint](test)
 
@@ -31,17 +31,16 @@ A typical CATS-rb analysis should follow one of the following use cases:
 
 # Installation 
 
-## Installing CATS-rb from source
+## Compatibility
 
 ### Linux and Windows
-CATS-rb consists of Bash and R scripts located in the `scripts` directory of this repository. After cloning the repository, all CATS-rb scripts must be included in the `PATH` environment variable. 
 
 For the best compatibility and performance, we recommend running CATS-rb on:
 - Any modern Linux distribution (e.g. Ubuntu, Debian, Fedora, etc.)
 - WSL (i.e. Ubuntu on Windows)
 
 ### MacOS
-If you’re using MacOS, Bash (version >= 4.0) and GNU versions of core utilities are required. In this case, `PATH` variable should be adjusted so that CATS-rb uses GNU versions of core utilities:
+If you are using MacOS, Bash (version >= 4.0) and GNU versions of core utilities are required. In this case, `PATH` variable should be adjusted so that CATS-rb uses GNU versions of core utilities:
 
 - Install Bash ≥ 4.0 via [Homebrew](https://formulae.brew.sh/formula/bash):
 
@@ -55,24 +54,43 @@ brew install bash
 brew install coreutils findutils gnu-sed gawk grep
 ```
 
-- Add GNU tools to your `PATH` (adjust path depending on your architecture):
+- Add Bash and GNU tools to your `PATH` (adjust path depending on your architecture):
 
+For Apple Sillicon:
 ```bash
+export PATH="/opt/homebrew/bin:$PATH"
 export PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:$PATH"
 export PATH="/opt/homebrew/opt/findutils/libexec/gnubin:$PATH"
 export PATH="/opt/homebrew/opt/gnu-sed/libexec/gnubin:$PATH"
 export PATH="/opt/homebrew/opt/grep/libexec/gnubin:$PATH"
 ```
 
-- Run the scripts using the installed Bash version (adjust path depending on your architecture):
-
+For Intel-based configurations
 ```bash
-/opt/homebrew/bin/bash CATS_rb_index
-/opt/homebrew/bin/bash CATS_rb_map
-/opt/homebrew/bin/bash CATS_rb_compare
+export PATH="/usr/local/bin:$PATH"
+export PATH="/usr/local/opt/coreutils/libexec/gnubin:$PATH"
+export PATH="/usr/local/opt/findutils/libexec/gnubin:$PATH"
+export PATH="/usr/local/opt/gnu-sed/libexec/gnubin:$PATH"
+export PATH="/usr/local/opt/grep/libexec/gnubin:$PATH"
 ```
 
-## Dependencies
+- Run the script using the installed Bash version:
+  
+```bash
+bash CATS_rb
+```
+
+## Installing CATS-rb via conda
+
+CATS-rb and its dependencies can be directly installed via [Bioconda](https://bioconda.github.io/):
+
+```bash
+conda install -c bioconda cats_rb
+```
+
+## Installing CATS-rb from source
+
+CATS-rb consists of Bash and R scripts located in the `scripts` directory of this repository. After cloning the repository, all CATS-rb scripts must be included in the `PATH` environment variable. 
 
 The following dependencies are required:
 
@@ -93,15 +111,7 @@ The following dependencies are required:
 | ComplexHeatmap (R)       | 2.20.0             | https://www.bioconductor.org/packages/devel/bioc/html/ComplexHeatmap.html       | `conda install -c bioconda bioconductor-complexheatmap`       | `BiocManager::install("ComplexHeatmap")`       |
 | GenomicDistributions (R) | 1.12.0             | https://www.bioconductor.org/packages/devel/bioc/html/GenomicDistributions.html | `conda install -c bioconda bioconductor-genomicdistributions` | `BiocManager::install("GenomicDistributions")` |
 
-R and Spaln executables must be included in `PATH`. Tools denoted with (R) correspond to R packages and can be installed directly in R with the supplied commands or via conda.
-
-## Installing CATS-rb via conda
-
-CATS-rb and its dependencies can be directly installed via [Bioconda](https://bioconda.github.io/):
-
-```bash
-conda install -c bioconda cats_rb
-```
+R (Rscript) and Spaln executables must be included in `PATH`. Tools denoted with (R) correspond to R packages and can be installed via conda or directly in R with the supplied commands.
 
 # Test data
 
@@ -281,7 +291,7 @@ All color name options (parameters `r`, `b`, `n`, `u`, `v`, `y`, and `c`) should
 
 `-q`: Maximum right-tail distribution quantile for raincloud plots, default: 0.995
 
-Raincloud plots omit right-tail extreme values for visualization purposes.
+Raincloud plots omit right-tail extreme values for visualization purposes. The x-axis in all raincloud plots is logarithmically scaled.
 
 `-f`: Number of longest genomic scaffolds for exon set genomic location plot, default: all scaffolds
 
@@ -339,7 +349,7 @@ Proportion of element sets covered by a GTF set is split into intervals defined 
 
 Several steps of CATS-rb are paralellized. This mainly includes operations performed by the data.table package. Recommended number of threads: 8-12.
 
-`-D`: Comparison results directory name, default: CATS_rb_comparison
+`-D`: Comparison output directory name, default: CATS_rb_comparison
 
 `-O`: Overwrite the comparison output directory, default: off
 
@@ -362,7 +372,7 @@ CATS-rb produces several summary files encompassing transcriptome assembly lengt
 
 ## Figures
 
-CATS-rb produces several figures, providing a detailed visualization of quality metrics:
+CATS-rb produces several figures, providing a detailed visualization of quality metrics. 
 
 `transcript_length` visualizes the distribution of transcript length.
 
