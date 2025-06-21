@@ -2,6 +2,18 @@
 
 <img src="cats_rb_logo.png" alt="Logo" width="750" height="160"/>
 
+# Table of Contents
+
+- [Introduction](#introduction)
+- [Installation](#installation)
+- [Test data](#test-data)
+- [Example usage](#example-usage)
+- [Detailed options](#detailed-options)
+- [Output explanation](#output-explanation)
+- [Citation](#citation)
+- [Troubleshooting](#troubleshooting)
+- [Changelog](#changelog)
+
 # Introduction 
 
 CATS-rb is the reference-based module of the CATS (Comprehensive Assessment of Transcript Sequences) framework. It evaluates transcriptome assembly quality using the reference genome of the corresponding or a closely related species. The pipeline maps transcripts to the reference genome and examines several mapping and completeness metrics.
