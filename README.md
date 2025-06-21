@@ -11,13 +11,13 @@ The main contribution of CATS-rb is the transcriptome assembly completeness anal
 - Relative completeness analysis: requires multiple (two or more) transcriptome assemblies
 - Annotation-based completenes analysis: requires one or more transcriptome assemblies and a reference gene annotation
 
-Completeness analysis introduces exon and transcript sets as units for assembly comparison, together denoted as element sets. Precisely, CATS-rb collapses overlapping exon and transcript genomic coordinates within a given assembly into non-redundant exon and transcript sets, respectively. Completeness of exon/transcript sets is compared between the analysed assemblies by constructing an undirected graph in which vertices represent exon/transcript sets and edges indicate overlaps between the corresponding sets of the compared assemblies. Overlapping exon/transcript sets are grouped into connected components, with the longest set designated as the group representative.
+Completeness analysis introduces exon and transcript sets as units for assembly comparison, together denoted as element sets. Precisely, CATS-rb collapses overlapping exon and transcript genomic coordinates of a given assembly into non-redundant exon and transcript sets, respectively. Completeness of exon/transcript sets is compared between the analysed assemblies by constructing an undirected graph in which vertices represent exon/transcript sets and edges indicate overlaps between the corresponding sets of the compared assemblies. Overlapping exon/transcript sets are grouped into connected components, with the longest set designated as the group representative.
 
 Element set completeness is quantified by its relative length compared to the representative set. Relative exon and transcript scores for each transcriptome assembly are computed as the mean of exon and transcript set completeness. Alongside completeness scores, CATS-rb also provides an in-depth analysis of missing, common, and unique element sets.
 
 Additionally, CATS-rb can perform an annotation-based analysis using element sets derived from a GTF file. This workflow follows the same principles as relative completeness analysis, while grouping element sets based on overlaps with GTF sets. As such, GTF sets are considered the representative for each set group. Annotation-based exon and transcript scores are calculated analogously to relative exon and transcript scores, offering an absolute measure of assembly completeness.
 
-CATS-rb exon and transcript scores exhibit a strong correlation with transcriptome assembly quality. Furthermore, relative and annotation-based scores display a strong correlation among assemblies with varying quality, enabling precise assembly quality assessment without strictly requiring reference annotation. 
+CATS-rb exon and transcript scores exhibit a strong correlation with transcriptome assembly quality. Furthermore, relative and annotation-based scores are strongly correlated when applied to assembly sets with varying quality, enabling precise assembly quality assessment without strictly requiring reference annotation. 
 
 For detailed benchmarks and methodology, please refer to the CATS [preprint](test)
 
@@ -25,9 +25,9 @@ For detailed benchmarks and methodology, please refer to the CATS [preprint](tes
 
 A typical CATS-rb analysis should follow one of the following use cases:
 
-- Assessing accuracy and completeness of one or more transcriptome assemblies relative to the reference assembly and/or reference gene annotation
+- Assessing accuracy and completeness of one or more transcriptome assemblies relative to the reference transcriptome assembly and/or reference gene annotation
 - Comparing relative accuracy and completeness of transcriptome assemblies generated from the same RNA-seq library
-- Comparing transcript content between different RNA-seq libraries
+- Comparing transcriptomic content between different RNA-seq libraries
 
 # Installation 
 
@@ -111,11 +111,11 @@ The following dependencies are required:
 | ComplexHeatmap (R)       | 2.20.0             | https://www.bioconductor.org/packages/devel/bioc/html/ComplexHeatmap.html       | `conda install -c bioconda bioconductor-complexheatmap`       | `BiocManager::install("ComplexHeatmap")`       |
 | GenomicDistributions (R) | 1.12.0             | https://www.bioconductor.org/packages/devel/bioc/html/GenomicDistributions.html | `conda install -c bioconda bioconductor-genomicdistributions` | `BiocManager::install("GenomicDistributions")` |
 
-R (Rscript) and Spaln executables must be included in `PATH`. Tools denoted with (R) correspond to R packages and can be installed via conda or directly in R with the supplied commands.
+R (Rscript) and Spaln executables must be included in `PATH`. Tools denoted with (R) correspond to R packages and can be installed via conda or directly in R with the supplied commands. R package BiocManager is required when installing Bioconductor packages (GenomicRanges, ComplexHeatmap, and GenomicDistributions) im R.
 
 # Test data
 
-CATS-rb installation can be tested using instructions and files stored in `test_data` directory.
+CATS-rb installation can be tested using instructions and files located in `test_data` directory.
 
 # Example usage 
 
@@ -123,7 +123,7 @@ CATS-rb workflow consists of three scripts which should be run in succession:
 
 ## Genome index generation script: `CATS_rb_index`
 
-This script generates the Spaln genome index for the reference genome.
+`CATS_rb_index` generates the Spaln genome index for the reference genome.
 
 Example usage:
 ```bash
@@ -132,7 +132,7 @@ CATS_rb_index [OPTIONS] GENOME
 
 ## Transcriptome assembly mapping script: `CATS_rb_map`
 
-This script maps the analysed transcriptome assembly to the reference genome. The script should be run on all analysed assemblies individually.
+`CATS_rb_map` maps the analysed transcriptome assembly to the reference genome. The script should be run on all analysed assemblies individually.
 
 Example usage:
 ```bash
@@ -141,7 +141,9 @@ CATS_rb_map [OPTIONS] GENOME_INDEX_DIR TRANSCRIPTOME
 
 ## Mapping comparison script: `CATS_rb_compare`
 
-This script compares the mapped transcriptome assemblies. Optionally, a reference gene annotation file can be supplied.
+`CATS_rb_compare` compares the mapped transcriptome assemblies. Optionally, a reference gene annotation file can be supplied.
+
+While `CATS_rb_compare` is primarily designed to compare multiple transcriptome assemblies, it can also be used with a single assembly to analyse general assembly length, composition, and CATS-rb mapping metrics.
 
 Example usage without reference annotation:
 ```bash
@@ -163,7 +165,7 @@ The following options are available for `CATS_rb_index`:
 
 `-m`: Maximum gene length (in bp), default: estimated from genome size
 
-Parameter `m` should be adjusted according to the analysed species.
+Value of `m` should be adjusted according to the analysed species.
 
 `-t`: Number of CPU threads, default: 10
 
@@ -179,23 +181,23 @@ The following options are available for `CATS_rb_map`:
 
 `-S`: Enable stranded mapping, default: off
 
-Parameter `S` restricts Spaln to align transcripts in their native 5′ to 3′ orientation.
+Stranded mapping restricts Spaln to align transcripts in their native 5′ to 3′ orientation.
 
 `-N`: Maximum number of mappings per transcript, default: 5
 
-Parameter `N` should be increased when analyzing species with complex genomes that contain many paralogous genes, and decreased for smaller or less complex genomes.
+Value of `N` should be increased when analyzing species with complex genomes that contain many paralogous genes, and decreased for smaller or less complex genomes.
 
 `-i`: Minimum intron length (in bp), default: 20
 
-Parameter `i` should be adjusted according to the analysed species.
+Value of `i` should be adjusted according to the analysed species.
 
 `-p`: Species-specific preset, default: unset
 
-Spaln provides species-specific presets that adjust various mapping parameters to suit different genomes. A list of supported species and their abbreviations can be found in the table/ directory within the Spaln installation (path_to_spaln_dir/table/), or on the [Spaln GitHub repository](https://github.com/ogotoh/spaln/blob/master/table/gnm2tab).
+Spaln provides species-specific presets that control various mapping parameters to suit different genomes. A list of supported species and their input values can be found in the table/ directory within the Spaln installation (path_to_spaln_dir/table/), or on the [Spaln GitHub repository](https://github.com/ogotoh/spaln/blob/master/table/gnm2tab).
 
 `-s`: Splice site characterization option, default: 2
 
-The `s` parameter controls how Spaln treats splice sites, following a predefined set of rules [adopted from Spaln github](https://github.com/ogotoh/spaln/blob/master):
+Value of `s` controls how Spaln treats splice sites, following a predefined set of rules [adopted from Spaln github](https://github.com/ogotoh/spaln/blob/master):
 
 0: accept only the canonical pairs (GT..AG,GC..AG,AT..AC)
 
@@ -209,7 +211,7 @@ The `s` parameter controls how Spaln treats splice sites, following a predefined
 
 `-T`: Relative contribution of translation initiation signal to mapping score, default: 1
 
-Parameters `P` and `T` should be configured according to the leverage that should be given to protein-coding transcripts (higher values -> more leverage).
+Values of `P` and `T` should be adjusted according to the leverage that should be given to protein-coding transcripts (higher values -> more leverage).
 
 `-t`: Number of CPU threads, default: 10
 
@@ -221,13 +223,13 @@ Transcriptome assembly mapping by Spaln is parallelized. Recommended number of t
 
 `-h`: Show usage information
 
- ## Transcriptome assembly mapping comparison
+## Transcriptome assembly mapping comparison
 
 The following options are available for `CATS_rb_compare`:
 
 `-S`: Enable stranded analysis, default: off
 
-Parameter `S` ensures that CATS-rb only examines transcripts mapping in their native 5' to 3' orientation. Furthermore, element set coordinates are depdendent on the genomic strand to which the transcript maps.
+Strandness analysis ensures that CATS-rb only examines transcripts mapping in their native 5' to 3' orientation. Furthermore, element set coordinates are depdendent on the genomic strand to which the transcript maps.
 
 `-p`: Minimum exon identity proportion, default: 0.98
 
