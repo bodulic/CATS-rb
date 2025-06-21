@@ -8,12 +8,12 @@ CATS-rb is the reference-based module of the CATS (Comprehensive Assessment of T
 
 The main contribution of CATS-rb is the transcriptome assembly completeness analysis, which can be performed in two settings: 
 
-- Relative completeness analysis: requires multiple (two or more) transcriptome assemblies
+- Relative completeness analysis: requires two or more transcriptome assemblies
 - Annotation-based completenes analysis: requires one or more transcriptome assemblies and a reference gene annotation
 
 Completeness analysis introduces exon and transcript sets as units for assembly comparison, together denoted as element sets. Precisely, CATS-rb collapses overlapping exon and transcript genomic coordinates of a given assembly into non-redundant exon and transcript sets, respectively. Completeness of exon/transcript sets is compared between the analysed assemblies by constructing an undirected graph in which vertices represent exon/transcript sets and edges indicate overlaps between the corresponding sets of the compared assemblies. Overlapping exon/transcript sets are grouped into connected components, with the longest set designated as the group representative.
 
-Element set completeness is quantified by its relative length compared to the representative set. Relative exon and transcript scores for each transcriptome assembly are computed as the mean of exon and transcript set completeness. Alongside completeness scores, CATS-rb also provides an in-depth analysis of missing, common, and unique element sets.
+Element set completeness is quantified by its relative length compared to the representative set. Relative exon and transcript scores for each transcriptome assembly are computed as the mean of exon and transcript set completeness, respectively. Alongside completeness scores, CATS-rb also provides an in-depth analysis of missing, common, and unique element sets.
 
 Additionally, CATS-rb can perform an annotation-based analysis using element sets derived from a GTF file. This workflow follows the same principles as relative completeness analysis, while grouping element sets based on overlaps with GTF sets. As such, GTF sets are considered the representative for each set group. Annotation-based exon and transcript scores are calculated analogously to relative exon and transcript scores, offering an absolute measure of assembly completeness.
 
@@ -23,11 +23,11 @@ For detailed benchmarks and methodology, please refer to the CATS [preprint](tes
 
 ## Use cases
 
-A typical CATS-rb analysis should follow one of the following use cases:
+A typical CATS-rb analysis generally fits into one of the following use cases:
 
 - Assessing accuracy and completeness of one or more transcriptome assemblies relative to the reference transcriptome assembly and/or reference gene annotation
 - Comparing relative accuracy and completeness of transcriptome assemblies generated from the same RNA-seq library
-- Comparing transcriptomic content between different RNA-seq libraries
+- Comparing transcriptomic content between transcriptome assemblies generated from different RNA-seq libraries
 
 # Installation 
 
@@ -54,7 +54,7 @@ brew install bash
 brew install coreutils findutils gnu-sed gawk grep
 ```
 
-- Add Bash and GNU tools to your `PATH` (adjust path depending on your architecture):
+- Add Bash and GNU utilities to your `PATH` (adjust path depending on your architecture):
 
 For Apple Sillicon:
 ```bash
@@ -74,7 +74,7 @@ export PATH="/usr/local/opt/gnu-sed/libexec/gnubin:$PATH"
 export PATH="/usr/local/opt/grep/libexec/gnubin:$PATH"
 ```
 
-- Run the script using the installed Bash version:
+- Run CATS-rb using the installed Bash version:
   
 ```bash
 bash CATS_rb
@@ -141,9 +141,9 @@ CATS_rb_map [OPTIONS] GENOME_INDEX_DIR TRANSCRIPTOME
 
 ## Mapping comparison script: `CATS_rb_compare`
 
-`CATS_rb_compare` compares the mapped transcriptome assemblies. Optionally, a reference gene annotation file can be supplied.
+`CATS_rb_compare` compares the mapped transcriptome assemblies. Optionally, a reference GTF/GFF3 gene annotation file can be supplied.
 
-While `CATS_rb_compare` is primarily designed to compare multiple transcriptome assemblies, it can also be used with a single assembly to analyse general assembly length, composition, and CATS-rb mapping metrics.
+While `CATS_rb_compare` is primarily designed to compare multiple transcriptome assemblies, it can also be used with a single assembly. However, the output will not contain the relative completeness analysis.
 
 Example usage without reference annotation:
 ```bash
@@ -197,7 +197,7 @@ Spaln provides species-specific presets that control various mapping parameters 
 
 `-s`: Splice site characterization option, default: 2
 
-Value of `s` controls how Spaln treats splice sites, following a predefined set of rules [adopted from Spaln github](https://github.com/ogotoh/spaln/blob/master):
+Value of `s` controls how Spaln treats splice sites, following a predefined set of rules [adopted from Spaln github repository](https://github.com/ogotoh/spaln/blob/master):
 
 0: accept only the canonical pairs (GT..AG,GC..AG,AT..AC)
 
@@ -229,17 +229,17 @@ The following options are available for `CATS_rb_compare`:
 
 `-S`: Enable stranded analysis, default: off
 
-Strandness analysis ensures that CATS-rb only examines transcripts mapping in their native 5' to 3' orientation. Furthermore, element set coordinates are depdendent on the genomic strand to which the transcript maps.
+Stranded analysis ensures that CATS-rb only examines transcripts mapping in their native 5' to 3' orientation. Furthermore, element set coordinates will be depdendent on the genomic strand to which the transcript maps. Stranded analysis should only be enabled if all analysed transcriptome assemblies were mapped in stranded mode.
 
 `-p`: Minimum exon identity proportion, default: 0.98
 
-Parameter `p` controls the minimum identity proportion for an exon to be analysed. More complex genomes should be assigned a higher value of `p` (e.g. 0.99 or 0.995) to minimze off-target mapping.
+More complex genomes should be assigned a higher value of `p` (e.g. 0.99 or 0.995) to minimze off-target mapping. On the other hand, value of `p` should be reduced if working with reference genome from a related species.
 
 `-e`: Minimum exon length (in bp), default: 20
 
 `-i`: Maximum intron length (in bp), default: 100000
 
-Parameters `e` and `i` should be adjusted according to the analysed species.
+Values of `e` and `i` should be adjusted according to the analysed species.
 
 `-M`: Alignment proportion threshold for structural inconsistency detection, default: 0.9
 
@@ -253,13 +253,13 @@ A transcript is classified as structurally inconsistent if its alignment proport
 
 `-m`: Maximum transcript set length for completeness analysis (in bp), default: 1000000
 
-Thresholds for element set length should be adjusted according to the analysed species. Complex genomes should be assigned higher thresholds. Maximum transcript set length should be adjusted according to the expected maximum gene size.
+Thresholds for element set length `l`, `L`, and `m` should be adjusted according to the analysed species. Complex genomes should be assigned higher thresholds. Maximum transcript set length should be adjusted according to the expected maximum gene size.
 
 `-j`: Minimum overlap between exon sets for edge specification (in bp), default: 1
 
 `-J`: Minimum overlap between transcript sets for edge specification (in bp), default: 1
 
-Parameters `j` and `J` control the required overlap length for exon and transcript sets to be connected by edges when constructing inter-assembly exon/transcript set graphs.
+Values of `j` and `J` control the required overlap length for exon and transcript sets to be connected by edges when constructing inter-assembly exon/transcript set graphs.
 
 `-o`: Minimum overlap between transcript set and transcript for isoform specification (in bp), default: 1
 
@@ -267,17 +267,17 @@ Isoforms are defined as transcripts overlapping the associated transcript set wi
 
 `-P`: Transcript set proximity region length for unique exon set analysis (in bp), default: 5000
 
-Genomic coordinates of unique exon sets from each transcriptome assembly are analyzed across non-origin assemblies. Each unique exon set is classified as either: (1) located within a transcript set, (2) proximal to a transcript set based on a defined threshold `P`, or (3) distant from any transcript set (in non-origin transcriptome assemblies).
+Genomic coordinates of unique exon sets from each transcriptome assembly are analyzed across non-origin assemblies. Each unique exon set is classified as either: (1) located within a transcript set, (2) proximal to a transcript set based on a defined threshold `P`, or (3) distant from any transcript set (in non-origin assemblies).
 
 `-x`: Figure extension, default: png
 
-`-d`: Figure DPI, default: 300
+`-d`: Figure DPI, default: 600
 
-Parameters `x` and `d` control the extension and DPI of each plotted figure. Note that UpSet plots and heatmaps will always be saved as a pdf file.
+Extension (device) and DPI of each plotted figure are controlled with `x` and `d`, respectively.
 
 `-r`: Raincloud plot colors (quoted hexadecimal codes or R color names, specified with x,y,z...), default: adjusted Set1 palette from RColorBrewer package
 
-All color name options (parameters `r`, `b`, `n`, `u`, `v`, `y`, and `c`) should be given as R color names or hexadecimal codes separated with commas and enclosed in quotes (e.g. "#FDAF4A,#DC151D"). R color cheatsheet is available [here](https://sites.stat.columbia.edu/tzheng/files/Rcolor.pdf)
+All color sets (parameters `r`, `b`, `n`, `u`, `v`, `y`, and `c`) should be supplied as R color names or hexadecimal codes separated with commas and enclosed in quotes (e.g. "#FDAF4A,#DC151D"). R color cheatsheet is available [here](https://sites.stat.columbia.edu/tzheng/files/Rcolor.pdf).
 
 `-b`: Barplot colors (quoted hexadecimal codes or R color names, specified with x,y,z...), default: adjusted YlOrRd palette from RColorBrewer package
 
@@ -293,33 +293,33 @@ All color name options (parameters `r`, `b`, `n`, `u`, `v`, `y`, and `c`) should
 
 `-q`: Maximum right-tail distribution quantile for raincloud plots, default: 0.995
 
-Raincloud plots omit right-tail extreme values for visualization purposes. The x-axis in all raincloud plots is logarithmically scaled.
+Raincloud plots omit right-tail extreme values for visualization purposes. The x-axis in all raincloud plots is logarithmically scaled. Raincloud plot densities are normalized for each transcriptome assembly. Boxplots within raincloud plots mark the distribution median, Q<sub>1</sub>, and Q<sub>3</sub>, with whiskers exnteding from -1.5*IQR to 1.5*IQR of the distribution.
 
 `-f`: Number of longest genomic scaffolds for exon set genomic location plot, default: all scaffolds
 
-Parameter `f` should be adjusted according to the number of relevant genomic scaffolds.
+Value of `f` should be adjusted according to the number of relevant genomic scaffolds.
 
-`-B`: Number of genomic bins for exon set genomic location plot, default: 50000
+`-B`: Number of genomic bins for exon set genomic location plot, default: 25000
 
-Increased values of `B` allow for a higher resolution of exon set genomic location plots.
+Higher values of `B` allow for a higher resolution of exon set genomic location plots.
 
 `-V`: Minimum completeness threshold for assigning an element set to a Venn set, default: 0.35.
 
-In Venn diagrams, element set completeness is used to define the plotted Venn sets. If element set completeness exceedes `V`, the set is considered shared with the reference element set.
+In Venn diagrams, element set completeness is used to define the plotted Venn sets. If element set completeness exceedes `V`, the set is considered shared with the reference element set. If both compared element sets are shared with the reference set, these element sets are considered common for the compared transcriptome assemblies.
 
 `-H`: Number of longest element sets used in hierarchical clustering, default: 5000
 
-Higher values of parameter `H` will result in more detailed heatmaps, but significantly increase runtime and RAM usage. The parameter is capped at 65000.
+Higher values of `H` will result in more detailed heatmaps, but significantly increase runtime and RAM usage. Value of `H` is capped at 65000.
 
 `-E`: Use raster for heatmap plotting, default: off
 
-Rasterization can be used to improve the plotting quality of resulting heatmaps.
+Rasterization can be used to improve heatmap quality.
 
 `-A`: Proportion of aligned transcript distribution breakpoints (specified with x,y,z...), default: "0,0.2,0.4,0.6,0.8,0.85,0.9,0.95,1"
 
 Proportion of aligned transcript is split into intervals defined by `A` (e.g. [0-0.2>, [0.2-0.4>...). This category variable is used for plotting. 
 
-All category variable breaks (options `A`, `N`, `R`, `I`, and `s`) should be given as strings separated with commas and enclosed in quotes (e.g. "0,0.2,0.4,0.6,0.8,0.85,0.9,0.95,1").
+All category variable breaks (`A`, `N`, `R`, `I`, and `s`) should be supplied as strings separated with commas and enclosed in quotes (e.g. "0,0.2,0.4,0.6,0.8,0.85,0.9,0.95,1").
 
 `-N`: Number of exons per transcript distribution breakpoints (specified with x,y,z...), default: "0,2,4,6,8,10,15,20"
 
@@ -335,13 +335,13 @@ Number of isoforms per transcript set is split into intervals defined by `I` (e.
 
 `-F`: GTF/GFF3 file for the annotation-based analysis
 
-If a GTF/GFF3 file is supplied, CATS-rb will perform the annotation-based analysis.
+If a GTF/GFF3 file is supplied, CATS-rb will also perform the annotation-based analysis.
 
 `-g`: Minimum proportion of an exon set that must be covered to be considered a match to a GTF exon set (and vice versa); default: 0.35
 
 `-G`: Minimum proportion of a transcript set that must be covered to be considered a match to a GTF transcript set (and vice versa); default: 0.35
 
-An assembly element set is considered matched to a GTF element set if their overlap exceeds a proportion `g` or `G` of the assembly element set’s length. Conversely, a GTF element set is considered matched to an assembly element set if their overlap exceeds the same proportion of the GTF element set length.
+An assembly element set is considered matched to a GTF element set if their overlap exceeds a proportion `g` (for exon sets) or `G` (for transcript sets) of the assembly element set’s length. Conversely, a GTF element set is considered matched to an assembly element set if their overlap exceeds the same proportion of the GTF element set length.
 
 `-s`: Proportion of element sets covered by a GTF set distribution breakpoints (specified with x,y,z...), default: "0,0.2,0.4,0.6,0.8,0.85,0.9,0.95,1"
 
@@ -349,7 +349,7 @@ Proportion of element sets covered by a GTF set is split into intervals defined 
 
 `-t`: Number of CPU threads, default: 10
 
-Several steps of CATS-rb are paralellized. This mainly includes operations performed by the data.table package. Recommended number of threads: 8-12.
+Several steps of CATS-rb transcriptome assembly comparison are parallelized. This mainly includes operations performed by the data.table package. Recommended number of threads: 8-12.
 
 `-D`: Comparison output directory name, default: CATS_rb_comparison
 
@@ -360,21 +360,21 @@ Several steps of CATS-rb are paralellized. This mainly includes operations perfo
 # Output explanation
 
 The analysis is summarized in the `CATS_rb_comparison.html` HTML file. 
-An example of the HTML output is provided [here](output_example.html)
+An example of the HTML output is provided [here](CATS_rb_output_example.html)
 
 ## Summary tables
 
 CATS-rb produces several summary files encompassing transcriptome assembly length statistics, various mapping metrics, and completeness analysis results:
 
-`CATS_rb_general_statistics.tsv`: contains descriptive statistics of transcript length (mean, median, interquartile range, range, N50, L50, N90, L90), GC content, and read mapping rate.
+`CATS_rb_general_statistics.tsv`: contains descriptive statistics of transcript length (mean, median, interquartile range, range, N50, L50, N90, L90( and GC content.
 
-`CATS_rb_main_comparison_results.tsv`: contains transcriptome assembly mapping metrics and the results of relative completeness analysis
+`CATS_rb_main_comparison_results.tsv`: contains transcriptome assembly mapping metrics and the results of relative completeness analysis.
 
 `CATS_rb_annotation_based_analysis_results.tsv`: contains the results of annotation-based completeness analysis. This table is provided only if the annotation-based analysis is enabled.
 
 ## Figures
 
-CATS-rb produces several figures, providing a detailed visualization of quality metrics. 
+CATS-rb produces several figures, providing a detailed visualization of CATS-rb quality metrics. 
 
 `transcript_length` visualizes the distribution of transcript length.
 
@@ -396,25 +396,25 @@ CATS-rb produces several figures, providing a detailed visualization of quality 
 
 `unique_exon_set_length` and `unique_transcript_set_length` visualize the distribution of unique exon/transcript set length. Unique sets correspond to sets found in only one of the analysed transcriptome asseblies.
 
-`exon_set_upset_plot.pdf` and `transcript_set_upset_plot.pdf` visualize the UpSet plot for exon/transcript sets. The UpSet plot is accompanied by two boxplots: the upper boxplot illustrates the length distribution of exon/transcript sets within each subset, while the lower boxplot displays the distribution of the ratio between the minimum and maximum exon/transcript set length within each subset.
+`exon_set_upset_plot.pdf` and `transcript_set_upset_plot.pdf` visualize UpSet plots for exon/transcript sets. The UpSet plot is accompanied by two boxplots: the upper boxplot illustrates the length distribution of exon/transcript sets within each subset, while the lower boxplot displays the distribution of the ratio between the minimum and maximum exon/transcript set length within each subset.
 
-`exon_set_pairwise_comp_similarity_tileplot` and `transcript_set_pairwise_comp_similarity_tileplot` visualize the exon/transcript set pairwise completeness similarity tileplot between the analysed transcriptome assemblies. Completeness similarity is defined as the mean completeness ratio of each corresponding exon/transcript set between each transcriptome assembly pair.
+`exon_set_pairwise_comp_similarity_tileplot` and `transcript_set_pairwise_comp_similarity_tileplot` visualize the exon/transcript set pairwise completeness similarity tileplot between the analysed transcriptome assemblies. Completeness similarity is defined as the mean completeness ratio of each corresponding exon/transcript set between each assembly pair.
 
-`pairwise_exon_set_venn_diagrams` and `pairwise_transcript_set_venn_diagrams` visualize the exon/transcript set Venn diagrams for each pair of the analysed assemblies. These plots are generated only when the comparison involves ten or fewer transcriptome assemblies.
+`pairwise_exon_set_venn_diagrams` and `pairwise_transcript_set_venn_diagrams` visualize the exon/transcript set Venn diagrams for each pair of the analysed transcriptome assemblies. These plots are generated only when the comparison involves ten or fewer assemblies.
 
-`exon_set_heatmap.pdf` and `transcript_set_heatmap.pdf` visualize hierarchical clustering heatmaps of exon/transcript sets. Transcriptome assemblies (columns) are clustered based on the relative completeness of exon/transcript sets (rows). Clustering is performed using complete linkage and Euclidean distance.
+`exon_set_heatmap.pdf` and `transcript_set_heatmap.pdf` visualize hierarchical clustering heatmaps of transcriptome assemblies and exon/transcript sets. Assemblies (columns) are clustered based on the relative completeness of clustered exon/transcript sets (rows). Clustering is performed using complete linkage and Euclidean distance.
 
-`unique_exon_set_position_in_non_origin_transcriptomes` visualizes the positional analysis of unique exon sets in non-origin transcriptome assemblies. Each unique exon set is classified as either: (1) located within a transcript set, (2) proximal to a transcript set, or (3) distant from any transcript set (in non-origin transcriptome assemblies).
+`unique_exon_set_position_in_non_origin_transcriptomes` visualizes the positional analysis of unique exon sets in non-origin transcriptome assemblies. Each unique exon set is classified as either: (1) located within a transcript set, (2) proximal to a transcript set, or (3) distant from any transcript set (in non-origin assemblies).
 
-`missing_exon_set_position` visualizes the positional analysis of missing exon sets. Each missing exon set is classified as either: (1) located in a transcript set, or (2) located outside any transcript set.
+`missing_exon_set_position` visualizes the positional analysis of missing exon sets. Each missing exon set is classified as either: (1) located in a transcript set, or (2) located outside any transcript set (in the transcriptome assembly from which the exon set is missing).
 
 `prop_of_exon_set_covered_by_a_gtf_set` and `prop_of_transcript_set_covered_by_a_gtf_set` visualize the distribution of the proportion of exon/transcript sets covered by a GTF set.
 
-`annotation_based_exon_set_upset_plot.pdf` and `annotation_based_transcript_set_upset_plot.pdf` visualize the annotation-based UpSet plot for exon/transcript sets. The UpSet plot is accompanied by two boxplots: the upper boxplot illustrates the length distribution of exon/transcript sets within each subset, while the lower boxplot displays the distribution of the ratio between the minimum and maximum exon/transcript set length within each subset.
+`annotation_based_exon_set_upset_plot.pdf` and `annotation_based_transcript_set_upset_plot.pdf` visualize the annotation-based UpSet plots for exon/transcript sets. The UpSet plot is accompanied by two boxplots: the upper boxplot illustrates the length distribution of exon/transcript sets within each subset, while the lower boxplot displays the distribution of the ratio between the minimum and maximum exon/transcript set length within each subset.
 
-`annotation_based_pairwise_exon_set_venn_diagrams` and `annotation_based_pairwise_transcript_set_venn_diagrams` visualize the annotation-based exon/transcript set Venn diagrams for each pair of the analysed assemblies. These plots are generated only when the comparison involves ten or fewer transcriptome assemblies.
+`annotation_based_pairwise_exon_set_venn_diagrams` and `annotation_based_pairwise_transcript_set_venn_diagrams` visualize the annotation-based exon/transcript set Venn diagrams for each pair of the analysed transcriptome assemblies. These plots are generated only when the comparison involves ten or fewer assemblies.
 
-`annotation_based_exon_set_heatmap.pdf` and `annotation_based_transcript_set_heatmap.pdf` visualize annotation-based hierarchical clustering heatmaps of exon/transcript sets. Transcriptome assemblies (columns) are clustered based on the relative completeness of exon/transcript sets (rows). Clustering is performed using complete linkage and Euclidean distance.
+`annotation_based_exon_set_heatmap.pdf` and `annotation_based_transcript_set_heatmap.pdf` visualize annotation-based hierarchical clustering heatmaps of transcriptome assemblies and exon/transcript sets. Assemblies (columns) are clustered based on the relative completeness of clustered exon/transcript sets (rows). Clustering is performed using complete linkage and Euclidean distance.
 
 ## Detailed tables
 
@@ -428,17 +428,17 @@ CATS-rb also produces several .tsv files containing detailed per-transcript and 
 
 `transcript_mapped_N.tsv` contains the number of mappings for each transcript.
 
-`transcripts_disjunct_genomic_region.tsv` lists transcripts classified as structurally inconsistent, with different transcript regions mapping to disjunct genomic locations.
+`transcripts_disjunct_genomic_regions.tsv` lists transcripts classified as structurally inconsistent, with different transcript segments mapping to disjunct genomic regions.
 
-`str_inconsistent_transcripts.tsv` lists all structurally inconsistent transcripts (unmapped + low alignment rate + segments mapping to disjunct genomic locations).
+`str_inconsistent_transcripts.tsv` lists all structurally inconsistent transcripts (unmapped + low alignment rate + segments mapping to disjunct genomic regions).
 
-`per_transcript_exon_n.tsv` contains the exon number per transcript.
+`per_transcript_exon_N.tsv` contains the exon number per transcript.
 
 `exon_sets.tsv` and `transcript_sets.tsv` contain exon/transcript set coordinates.
 
 `unique_exon_sets.tsv` and `unique_transcript_sets.tsv` contain unique eoxn/transcript set coordinates.
 
-`missing_exon_set_ranges.tsv` contains coordinate ranges of missing exon sets identified in other transcriptome assemblies. Range coordinates are defined by taking the range form minimum to maximum coordinate of the exon set group in all assemblies in which the set was identified.
+`missing_exon_set_ranges.tsv` contains genomic coordinate ranges of missing exon sets identified in other transcriptome assemblies. Range coordinates are defined by taking the range form minimum to maximum coordinate of the exon set group in all assemblies in which the set was identified.
 
 `exon_set_pairwise_completeness_similarity_matrix.tsv` and `transcript_set_pairwise_completeness_similarity_matrix.tsv` contain the exon/transcript set pairwise completeness similarity tileplot between the analysed transcriptome assemblies. Completeness similarity is defined as the mean completeness ratio of each corresponding exon/transcript set between each transcriptome assembly pair.
 
