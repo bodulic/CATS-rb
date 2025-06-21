@@ -6,7 +6,7 @@
 
 CATS-rb is the reference-based module of the CATS (Comprehensive Assessment of Transcript Sequences) framework. It evaluates transcriptome assembly quality using the reference genome of the corresponding or a closely related species. The pipeline maps transcripts to the reference genome and examines several mapping and completeness metrics.
 
-The main contribution of CATS-rb is the transcriptome assembly completeness analysis, which can be performed in two settings: 
+The main contribution of CATS-rb is transcriptome assembly completeness analysis, which can be performed in two settings: 
 
 - Relative completeness analysis: requires two or more transcriptome assemblies
 - Annotation-based completenes analysis: requires one or more transcriptome assemblies and a reference gene annotation
@@ -143,7 +143,7 @@ CATS_rb_map [OPTIONS] GENOME_INDEX_DIR TRANSCRIPTOME
 
 `CATS_rb_compare` compares the mapped transcriptome assemblies. Optionally, a reference GTF/GFF3 gene annotation file can be supplied.
 
-While `CATS_rb_compare` is primarily designed to compare multiple transcriptome assemblies, it can also be used with a single assembly. However, the output will not contain the relative completeness analysis.
+While `CATS_rb_compare` is primarily designed to compare multiple transcriptome assemblies, it can also be used with a single assembly. However, the output will not contain relative completeness analysis.
 
 Example usage without reference annotation:
 ```bash
@@ -305,7 +305,7 @@ Higher values of `B` allow for a higher resolution of exon set genomic location 
 
 `-V`: Minimum completeness threshold for assigning an element set to a Venn set, default: 0.35.
 
-In Venn diagrams, element set completeness is used to define the plotted Venn sets. If element set completeness exceedes `V`, the set is considered shared with the reference element set. If both compared element sets are shared with the reference set, these element sets are considered common for the compared transcriptome assemblies.
+In Venn diagrams, element set completeness is used to define the plotted Venn sets. If element set completeness exceedes `V`, the set is considered shared with the reference element set. If both compared element sets are shared with the reference set, these element sets are considered common between the compared transcriptome assemblies.
 
 `-H`: Number of longest element sets used in hierarchical clustering, default: 5000
 
@@ -370,7 +370,7 @@ CATS-rb produces several summary files encompassing transcriptome assembly lengt
 
 `CATS_rb_main_comparison_results.tsv`: contains transcriptome assembly mapping metrics and the results of relative completeness analysis.
 
-`CATS_rb_annotation_based_analysis_results.tsv`: contains the results of annotation-based completeness analysis. This table is provided only if the annotation-based analysis is enabled.
+`CATS_rb_annotation_based_analysis_results.tsv`: contains the results of annotation-based completeness analysis. This table is provided only if annotation-based analysis is enabled.
 
 ## Figures
 
@@ -392,27 +392,27 @@ CATS-rb produces several figures, providing a detailed visualization of CATS-rb 
 
 `common_exon_set_length` and `common_transcript_set_length` visualize the distribution of common exon/transcript set length. Common sets correspond to set groups found in all analysed trasncriptome assemblies.
 
-`common_exon_set_relative_length` and `common_transcript_set_relative_length` visualize the distribution of relative common exon/transcript set length. Relative length is calculated with respect to the longest set within each group of common sets.
+`common_exon_set_relative_length` and `common_transcript_set_relative_length` visualize the distribution of common exon/transcript set relative length. Relative length is calculated with respect to the longest set within each group of common sets.
 
 `unique_exon_set_length` and `unique_transcript_set_length` visualize the distribution of unique exon/transcript set length. Unique sets correspond to sets found in only one of the analysed transcriptome asseblies.
 
-`exon_set_upset_plot.pdf` and `transcript_set_upset_plot.pdf` visualize UpSet plots for exon/transcript sets. The UpSet plot is accompanied by two boxplots: the upper boxplot illustrates the length distribution of exon/transcript sets within each subset, while the lower boxplot displays the distribution of the ratio between the minimum and maximum exon/transcript set length within each subset.
+`exon_set_upset_plot.pdf` and `transcript_set_upset_plot.pdf` visualize UpSet plots for exon/transcript sets. Each UpSet plot is accompanied by two boxplots: the upper boxplot illustrates the length distribution of exon/transcript sets within each subset, while the lower boxplot displays the distribution of the ratio between the minimum and maximum exon/transcript set length within each subset.
 
 `exon_set_pairwise_comp_similarity_tileplot` and `transcript_set_pairwise_comp_similarity_tileplot` visualize the exon/transcript set pairwise completeness similarity tileplot between the analysed transcriptome assemblies. Completeness similarity is defined as the mean completeness ratio of each corresponding exon/transcript set between each assembly pair.
 
-`pairwise_exon_set_venn_diagrams` and `pairwise_transcript_set_venn_diagrams` visualize the exon/transcript set Venn diagrams for each pair of the analysed transcriptome assemblies. These plots are generated only when the comparison involves ten or fewer assemblies.
+`pairwise_exon_set_venn_diagrams` and `pairwise_transcript_set_venn_diagrams` visualize the exon/transcript set Venn diagrams for each transcriptome assembly pair. These plots are generated only when the comparison involves ten or fewer assemblies.
 
 `exon_set_heatmap.pdf` and `transcript_set_heatmap.pdf` visualize hierarchical clustering heatmaps of transcriptome assemblies and exon/transcript sets. Assemblies (columns) are clustered based on the relative completeness of clustered exon/transcript sets (rows). Clustering is performed using complete linkage and Euclidean distance.
 
 `unique_exon_set_position_in_non_origin_transcriptomes` visualizes the positional analysis of unique exon sets in non-origin transcriptome assemblies. Each unique exon set is classified as either: (1) located within a transcript set, (2) proximal to a transcript set, or (3) distant from any transcript set (in non-origin assemblies).
 
-`missing_exon_set_position` visualizes the positional analysis of missing exon sets. Each missing exon set is classified as either: (1) located in a transcript set, or (2) located outside any transcript set (in the transcriptome assembly from which the exon set is missing).
+`missing_exon_set_position` visualizes the positional analysis of missing exon sets. Each missing exon set is classified as either: (1) located within a transcript set, or (2) located outside any transcript set (in the transcriptome assembly from which the exon set is missing).
 
 `prop_of_exon_set_covered_by_a_gtf_set` and `prop_of_transcript_set_covered_by_a_gtf_set` visualize the distribution of the proportion of exon/transcript sets covered by a GTF set.
 
-`annotation_based_exon_set_upset_plot.pdf` and `annotation_based_transcript_set_upset_plot.pdf` visualize the annotation-based UpSet plots for exon/transcript sets. The UpSet plot is accompanied by two boxplots: the upper boxplot illustrates the length distribution of exon/transcript sets within each subset, while the lower boxplot displays the distribution of the ratio between the minimum and maximum exon/transcript set length within each subset.
+`annotation_based_exon_set_upset_plot.pdf` and `annotation_based_transcript_set_upset_plot.pdf` visualize annotation-based UpSet plots for exon/transcript sets. Each UpSet plot is accompanied by two boxplots: the upper boxplot illustrates the length distribution of exon/transcript sets within each subset, while the lower boxplot displays the distribution of the ratio between the minimum and maximum exon/transcript set length within each subset.
 
-`annotation_based_pairwise_exon_set_venn_diagrams` and `annotation_based_pairwise_transcript_set_venn_diagrams` visualize the annotation-based exon/transcript set Venn diagrams for each pair of the analysed transcriptome assemblies. These plots are generated only when the comparison involves ten or fewer assemblies.
+`annotation_based_pairwise_exon_set_venn_diagrams` and `annotation_based_pairwise_transcript_set_venn_diagrams` visualize annotation-based exon/transcript set Venn diagrams for each transcriptome assembly pair. These plots are generated only when the comparison involves ten or fewer assemblies.
 
 `annotation_based_exon_set_heatmap.pdf` and `annotation_based_transcript_set_heatmap.pdf` visualize annotation-based hierarchical clustering heatmaps of transcriptome assemblies and exon/transcript sets. Assemblies (columns) are clustered based on the relative completeness of clustered exon/transcript sets (rows). Clustering is performed using complete linkage and Euclidean distance.
 
@@ -428,7 +428,7 @@ CATS-rb also produces several .tsv files containing detailed per-transcript and 
 
 `transcript_mapped_N.tsv` contains the number of mappings for each transcript.
 
-`transcripts_disjunct_genomic_regions.tsv` lists transcripts classified as structurally inconsistent, with different transcript segments mapping to disjunct genomic regions.
+`transcripts_disjunct_genomic_regions.tsv` lists transcripts classified as structurally inconsistent due to different transcript segments mapping to disjunct genomic regions.
 
 `str_inconsistent_transcripts.tsv` lists all structurally inconsistent transcripts (unmapped + low alignment rate + segments mapping to disjunct genomic regions).
 
@@ -438,9 +438,9 @@ CATS-rb also produces several .tsv files containing detailed per-transcript and 
 
 `unique_exon_sets.tsv` and `unique_transcript_sets.tsv` contain unique eoxn/transcript set coordinates.
 
-`missing_exon_set_ranges.tsv` contains genomic coordinate ranges of missing exon sets identified in other transcriptome assemblies. Range coordinates are defined by taking the range form minimum to maximum coordinate of the exon set group in all assemblies in which the set was identified.
+`missing_exon_set_ranges.tsv` contains genomic coordinate ranges of missing exon sets identified in other transcriptome assemblies. Range coordinates are defined by taking the range form minimum to maximum coordinate of the exon set group in all assemblies in which the set was found.
 
-`exon_set_pairwise_completeness_similarity_matrix.tsv` and `transcript_set_pairwise_completeness_similarity_matrix.tsv` contain the exon/transcript set pairwise completeness similarity tileplot between the analysed transcriptome assemblies. Completeness similarity is defined as the mean completeness ratio of each corresponding exon/transcript set between each transcriptome assembly pair.
+`exon_set_pairwise_completeness_similarity_matrix.tsv` and `transcript_set_pairwise_completeness_similarity_matrix.tsv` contain exon/transcript set pairwise completeness similarity between the analysed transcriptome assemblies. Completeness similarity is defined as the mean completeness ratio of each corresponding exon/transcript set between each assembly pair.
 
 # Citation
 
