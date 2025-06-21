@@ -6,44 +6,44 @@ usage () {
  echo "Mapping comparison options:" >&2
  echo "-S: Enable stranded analysis, default: off" >&2
  echo "-p: Minimum exon identity proportion, default: 0.98" >&2
- echo "-e: Minimum exon length (in bp), default: 20 bp" >&2
- echo "-i: Maximum intron length (in bp), default: 100000 bp" >&2
+ echo "-e: Minimum exon length (in bp), default: 20" >&2
+ echo "-i: Maximum intron length (in bp), default: 100000" >&2
  echo "-M: Alignment proportion threshold for structural inconsistency detection, default: 0.9" >&2
- echo "-C: Maximum proportion of allowed transcript segment overlap for identification of segments mapping to different genomic regions, default: 0.3" >&2
- echo "-l: Minimum exon set length for completeness analysis (in bp), default: 0 bp" >&2
- echo "-L: Minimum transcript set length for completeness analysis (in bp), default: 100 bp" >&2
- echo "-m: Maximum transcript set length for completeness analysis (in bp), default: 1000000 bp" >&2
- echo "-j: Minimum overlap between exon sets for edge specification (in bp), default: 1 bp" >&2
- echo "-J: Minimum overlap between transcript sets for edge specification (in bp), default: 1 bp" >&2
- echo "-o: Minimum overlap between transcript set and transcript for isoform specification (in bp), default: 1 bp" >&2
- echo "-P: Transcript set proximity region length for unique exon set analysis (in bp), default: 5000 bp" >&2
+ echo "-C: Maximum proportion of allowed transcript segment overlap for identification of segments mapping to disjunct genomic regions, default: 0.3" >&2
+ echo "-l: Minimum exon set length for completeness analysis (in bp), default: 0" >&2
+ echo "-L: Minimum transcript set length for completeness analysis (in bp), default: 100" >&2
+ echo "-m: Maximum transcript set length for completeness analysis (in bp), default: 1000000" >&2
+ echo "-j: Minimum overlap between exon sets for edge specification (in bp), default: 1" >&2
+ echo "-J: Minimum overlap between transcript sets for edge specification (in bp), default: 1" >&2
+ echo "-o: Minimum overlap between transcript set and transcript for isoform specification (in bp), default: 1" >&2
+ echo "-P: Transcript set proximity region length for unique exon set analysis (in bp), default: 5000" >&2
  echo "-x: Figure extension, default: png" >&2
- echo "-d: Figure DPI, default: 300" >&2
- echo "-r: Raincloud plot colors (quoted hexadecimal codes or R color names, specified with x,y,z...), default: adjusted Set1 palette from the RColorBrewer package" >&2
- echo "-b: Barplot colors (quoted hexadecimal codes or R color names, specified with x,y,z...), default: adjusted YlOrRd palette from the RColorBrewer package" >&2
- echo "-n: Exon set genomic location plot colors (quoted hexadecimal codes or R color names, specified with x,y,z...), default: adjusted Set1 palette from the RColorBrewer package" >&2
+ echo "-d: Figure DPI, default: 600" >&2
+ echo "-r: Raincloud plot colors (quoted hexadecimal codes or R color names, specified with x,y,z...), default: adjusted Set1 palette from RColorBrewer package" >&2
+ echo "-b: Barplot colors (quoted hexadecimal codes or R color names, specified with x,y,z...), default: adjusted YlOrRd palette from RColorBrewer package" >&2
+ echo "-n: Exon set genomic location plot colors (quoted hexadecimal codes or R color names, specified with x,y,z...), default: adjusted Set1 palette from RColorBrewer package" >&2
  echo "-u: UpSet plot bar and matrix colors (quoted hexadecimal codes or R color names, specified with x,y,z...), default: #FDAF4A,#DC151D" >&2
- echo "-v: Venn diagram colors (quoted hexadecimal codes or R color names, specified with x,y,z...), default: adjusted Reds palette from the RColorBrewer package" >&2
- echo "-y: Pairwise similarity tileplot colors (quoted hexadecimal codes or R color names, specified with x,y,z...), default: adjusted YlOrRd palette from the RColorBrewer package" >&2
- echo "-c: Hierarchical clustering heatmap colors (quoted hexadecimal codes or R color names, specified with x,y,z...), default: adjusted YlOrRd palette from the RColorBrewer package" >&2
+ echo "-v: Venn diagram colors (quoted hexadecimal codes or R color names, specified with x,y,z...), default: adjusted Reds palette from RColorBrewer package" >&2
+ echo "-y: Pairwise similarity tileplot colors (quoted hexadecimal codes or R color names, specified with x,y,z...), default: adjusted YlOrRd palette from RColorBrewer package" >&2
+ echo "-c: Hierarchical clustering heatmap colors (quoted hexadecimal codes or R color names, specified with x,y,z...), default: adjusted YlOrRd palette from RColorBrewer package" >&2
  echo "-q: Maximum right-tail distribution quantile for raincloud plots, default: 0.995" >&2
- echo "-f: Number of longest genomic scaffolds for genomic location plotting of exon sets, default: all scaffolds" >&2
- echo "-B: Number of genomic bins for genomic location plotting of exon sets, default: 50000" >&2
- echo "-V: Minimum overlap proportion for an element set to be assigned to a Venn set, default: 0.35" >&2
+ echo "-f: Number of longest genomic scaffolds for exon set genomic location plot, default: all scaffolds" >&2
+ echo "-B: Number of genomic bins for exon set genomic location plot, default: 25000" >&2
+ echo "-V: Minimum completeness threshold for assigning an element set to a Venn set, default: 0.35" >&2
  echo "-H: Number of longest element sets used in hierarchical clustering, default: 5000" >&2
  echo "-E: Use raster for heatmap plotting, default: off" >&2
- echo "-A: Proportion of aligned transcript distribution breakpoints (specified with x,y,z...), default: 0,0.1,0.3,0.5,0.7,0.9,0.95,1" >&2
+ echo "-A: Proportion of aligned transcript distribution breakpoints (specified with x,y,z...), default: 0,0.2,0.4,0.6,0.8,0.85,0.9,0.95,1" >&2
  echo "-N: Number of exons per transcript distribution breakpoints (specified with x,y,z...), default: 0,2,4,6,8,10,15,20" >&2
- echo "-R: Common element set relative length distribution breakpoints (specified with x,y,z...), default: 0,0.1,0.3,0.5,0.7,0.9,0.95,1" >&2
+ echo "-R: Common element set relative length distribution breakpoints (specified with x,y,z...), default: 0,0.2,0.4,0.6,0.8,0.85,0.9,0.95,1" >&2
  echo "-I: Number of isoforms per transcript set distribution breakpoints (specified with x,y,z...), default: 0,2,4,6,8,10,15,20" >&2
  echo "Annotation-based analysis options (requires a GTF/GFF3 file to be supplied):" >&2
  echo "-F: GTF/GFF3 file for the annotation-based analysis" >&2
  echo "-g: Minimum proportion of an exon set that must be covered to be considered a match to a GTF exon set (and vice versa); default: 0.35" >&2
  echo "-G: Minimum proportion of a transcript set that must be covered to be considered a match to a GTF transcript set (and vice versa); default: 0.35" >&2
- echo "-s: Proportion of element sets covered by a GTF set distribution breakpoints (specified with x,y,z...), default: 0,0.1,0.3,0.5,0.7,0.9,0.95,1" >&2
+ echo "-s: Proportion of element sets covered by a GTF set distribution breakpoints (specified with x,y,z...), default: 0,0.2,0.4,0.6,0.8,0.85,0.9,0.95,1" >&2
  echo "General options:" >&2
  echo "-t: Number of CPU threads, default: 10" >&2
- echo "-D: Comparison results directory name, default: CATS_rb_comparison" >&2
+ echo "-D: Comparison output directory name, default: CATS_rb_comparison" >&2
  echo "-O: Overwrite the comparison output directory, default: off" >&2
  echo "-h: Show usage information" >&2
  exit 1
@@ -146,7 +146,7 @@ MIN_TR_SET_OVL=1
 MIN_ISO_OVL=1
 TR_SET_PROX_LEN=5000
 FIGURE_EXT="png"
-FIGURE_DPI=300
+FIGURE_DPI=600
 RP_COLORS="#E41A1C,#377EB8,#4DAF4A,#984EA3,#FF7F00,#A65628,#F781BF,#999999"
 BP_COLORS="#FFEDA0,#FED976,#FEB24C,#FD8D3C,#FC4E2A,#E31A1C,#BD0026"
 GP_COLORS="#E41A1C,#377EB8,#4DAF4A,#984EA3,#FF7F00,#A65628,#F781BF,#999999"
@@ -155,17 +155,17 @@ VD_COLORS="#FFF5F0,#FEE0D2,#FCBBA1,#FC9272,#FB6A4A,#EF3B2C,#CB181D,#A50F15"
 TP_COLORS="#FFEDA0,#FED976,#FEB24C,#FD8D3C,#FC4E2A,#E31A1C,#BD0026"
 HP_COLORS="#FFEDA0,#FED976,#FEB24C,#FD8D3C,#FC4E2A,#E31A1C,#BD0026"
 RP_MAX_QUANTILE=0.995
-GENOMIC_BIN_N=50000
+GENOMIC_BIN_N=25000
 VD_MIN_OVL_PROP=0.35
 HP_EL_N=5000
 HP_RASTER="F"
-TR_ALN_PROP_BREAKS="0,0.1,0.3,0.5,0.7,0.9,0.95,1"
+TR_ALN_PROP_BREAKS="0,0.2,0.4,0.6,0.8,0.85,0.9,0.95,1"
 EXON_PER_TR_N_BREAKS="0,2,4,6,8,10,15,20"
-COMM_EL_SET_REL_BREAKS="0,0.1,0.3,0.5,0.7,0.9,0.95,1"
+COMM_EL_SET_REL_BREAKS="0,0.2,0.4,0.6,0.8,0.85,0.9,0.95,1"
 ISO_N_BREAKS="0,2,4,6,8,10,15,20"
 MIN_EX_SET_GTF_SET_OVL_PROP=0.35
 MIN_TR_SET_GTF_SET_OVL_PROP=0.35
-EL_SET_GTF_SET_OVL_PROP_BREAKS="0,0.1,0.3,0.5,0.7,0.9,0.95,1"
+EL_SET_GTF_SET_OVL_PROP_BREAKS="0,0.2,0.4,0.6,0.8,0.85,0.9,0.95,1"
 THREAD_N=10
 OUT_DIR="CATS_rb_comparison"
 OVERWRITE_RES="F"
@@ -275,7 +275,7 @@ exec 3>&2
 exec 2> >(tee "$LOG_FILE" >&3)
 
 #Printing welcome message
-echo "Welcome to CATS-rb reference-based transcriptome assembly comparison tool (version 1.0.0). Find us on www.github.com/kbodulic.com"
+echo "Welcome to CATS-rb transcriptome assembly comparison tool (version 1.0.0). Find us on https://github.com/bodulic/CATS-rb/tree/main"
 
 #Checking executable requirements
 check_executable Rscript
@@ -316,22 +316,22 @@ fi
 
 #Testing numerical arguments
 test_numeric_arg "${MIN_EX_ID_PROP}" "MIN_EX_ID_PROP" 0.98 "Supplied an incorrect value for the minimum exon identity proportion, defaulting to 0.98"
-test_numeric_arg "${MIN_EX_LEN}" "MIN_EX_LEN" 20 "Supplied an incorrect value for the minimum exon length, defaulting to 20 bp"
-test_numeric_arg "${MAX_INT_LEN}" "MAX_INT_LEN" 100000 "Supplied an incorrect value for the maximum intron length, defaulting to 100000 bp"
+test_numeric_arg "${MIN_EX_LEN}" "MIN_EX_LEN" 20 "Supplied an incorrect value for the minimum exon length, defaulting to 20"
+test_numeric_arg "${MAX_INT_LEN}" "MAX_INT_LEN" 100000 "Supplied an incorrect value for the maximum intron length, defaulting to 100000"
 test_numeric_arg "${STR_INC_ALN_PROP}" "STR_INC_ALN_PROP" 0.9 "Supplied an incorrect value for the alignment proportion threshold for structural inconsistency detection, defaulting to 0.9"
-test_numeric_arg "${STR_INC_MAX_OVL_PROP}" "STR_INC_MAX_OVL_PROP" 0.3 "Supplied an incorrect value for the maximum proportion of allowed transcript segment overlap for identification of segments mapping to different genomic regions, defaulting to 0.3"
-test_numeric_arg "${MIN_EX_SET_LEN}" "MIN_EX_SET_LEN" 0 "Supplied an incorrect value for the minimum exon set length for completeness analysis, defaulting to 0 bp"
-test_numeric_arg "${MIN_TR_SET_LEN}" "MIN_TR_SET_LEN" 100 "Supplied an incorrect value for the minimum transcript set length for completeness analysis, defaulting to 100 bp"
-test_numeric_arg "${MAX_TR_SET_LEN}" "MAX_TR_SET_LEN" 1000000 "Supplied an incorrect value for the maximum transcript set length for completeness analysis, defaulting to 1000000 bp"
-test_numeric_arg "${MIN_EX_SET_OVL}" "MIN_EX_SET_OVL" 1 "Supplied an incorrect value for the minimum overlap between exon sets for edge specification, defaulting to 1 bp"
-test_numeric_arg "${MIN_TR_SET_OVL}" "MIN_TR_SET_OVL" 1 "Supplied an incorrect value for minimum overlap between transcript sets for edge specification, defaulting to 1 bp"
-test_numeric_arg "${MIN_ISO_OVL}" "MIN_ISO_OVL" 1 "Supplied an incorrect value for the minimum overlap between transcript set and transcript for isoform specification, defaulting to 1 bp"
-test_numeric_arg "${TR_SET_PROX_LEN}" "TR_SET_PROX_LEN" 5000 "Supplied an incorrect value for the transcript set proximity region length for unique exon set analysis, defaulting to 5000 bp"
-test_numeric_arg "${FIGURE_DPI}" "FIGURE_DPI" 300 "Supplied an incorrect value for figure DPI, defaulting to 300"
+test_numeric_arg "${STR_INC_MAX_OVL_PROP}" "STR_INC_MAX_OVL_PROP" 0.3 "Supplied an incorrect value for the maximum proportion of allowed transcript segment overlap for identification of segments mapping to disjunct genomic regions, defaulting to 0.3"
+test_numeric_arg "${MIN_EX_SET_LEN}" "MIN_EX_SET_LEN" 0 "Supplied an incorrect value for the minimum exon set length for completeness analysis, defaulting to 0"
+test_numeric_arg "${MIN_TR_SET_LEN}" "MIN_TR_SET_LEN" 100 "Supplied an incorrect value for the minimum transcript set length for completeness analysis, defaulting to 100"
+test_numeric_arg "${MAX_TR_SET_LEN}" "MAX_TR_SET_LEN" 1000000 "Supplied an incorrect value for the maximum transcript set length for completeness analysis, defaulting to 1000000"
+test_numeric_arg "${MIN_EX_SET_OVL}" "MIN_EX_SET_OVL" 1 "Supplied an incorrect value for the minimum overlap between exon sets for edge specification, defaulting to 1"
+test_numeric_arg "${MIN_TR_SET_OVL}" "MIN_TR_SET_OVL" 1 "Supplied an incorrect value for minimum overlap between transcript sets for edge specification, defaulting to 1"
+test_numeric_arg "${MIN_ISO_OVL}" "MIN_ISO_OVL" 1 "Supplied an incorrect value for the minimum overlap between transcript set and transcript for isoform specification, defaulting to 1"
+test_numeric_arg "${TR_SET_PROX_LEN}" "TR_SET_PROX_LEN" 5000 "Supplied an incorrect value for the transcript set proximity region length for unique exon set analysis, defaulting to 5000"
+test_numeric_arg "${FIGURE_DPI}" "FIGURE_DPI" 600 "Supplied an incorrect value for figure DPI, defaulting to 600"
 test_numeric_arg "${RP_MAX_QUANTILE}" "RP_MAX_QUANTILE" 0.995 "Supplied an incorrect value for the maximum right-tail distribution quantile for raincloud plots, defaulting to 0.995"
-test_numeric_arg "${LONGEST_SCAFF_N}" "LONGEST_SCAFF_N" "" "Supplied an incorrect value for the number of longest genomic scaffolds for genomic location plotting of exon sets, defaulting to all scaffolds"
-test_numeric_arg "${GENOMIC_BIN_N}" "GENOMIC_BIN_N" 50000 "Supplied an incorrect value for the number of genomic bins for genomic location plotting of exon sets, defaulting to 50000"
-test_numeric_arg "${VD_MIN_OVL_PROP}" "VD_MIN_OVL_PROP" 0.35 "Supplied an incorrect value for the minimum overlap proportion for an element set to be assigned to a Venn set, defaulting to 0.35"
+test_numeric_arg "${LONGEST_SCAFF_N}" "LONGEST_SCAFF_N" "" "Supplied an incorrect value for the number of longest genomic scaffolds for exon set genomic location plot, defaulting to all scaffolds"
+test_numeric_arg "${GENOMIC_BIN_N}" "GENOMIC_BIN_N" 25000 "Supplied an incorrect value for the number of genomic bins for exon set genomic location plot, defaulting to 25000"
+test_numeric_arg "${VD_MIN_OVL_PROP}" "VD_MIN_OVL_PROP" 0.35 "Supplied an incorrect value for the minimum completeness threshold for assigning an element set to a Venn set, defaulting to 0.35"
 test_numeric_arg "${HP_EL_N}" "HP_EL_N" 5000 "Supplied an incorrect value for the number of longest element sets used in hierarchical clustering, defaulting to 5000"
 test_numeric_arg "${THREAD_N}" "THREAD_N" 10 "Supplied an incorrect value for the number of CPU threads, defaulting to 10"
 
@@ -363,9 +363,9 @@ then
  HP_EL_N=65000
 fi
 
-#Creating output directory
+#Creating the output directory
 mkdir "${OUT_DIR}"
-check_exit_status "Creating output directory failed"
+check_exit_status "Creating the output directory failed"
 
 #Creating symbolic links
 ln -s -r -t "${OUT_DIR}" "${GENOME}"
@@ -447,5 +447,5 @@ then
 fi
 
 #Exiting
-write_log INFO "Thank you for using CATS-rb! The transcriptome assembly comparison results can be found in ${OUT_DIR}"
+write_log INFO "Thank you for using CATS-rb! The CATS-rb transcriptome assembly comparison output can be found in ${OUT_DIR}"
 exit 0

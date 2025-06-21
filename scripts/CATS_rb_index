@@ -113,7 +113,7 @@ exec 3>&2
 exec 2> >(tee "$LOG_FILE" >&3)
 
 #Printing welcome message
-echo "Welcome to CATS-rb genome index genertion tool (version 1.0.0). Find us on www.github.com/kbodulic.com"
+echo "Welcome to CATS-rb genome index genertion tool (version 1.0.0). Find us on https://github.com/bodulic/CATS-rb/tree/main"
 
 #Checking executable requirements
 check_executable spaln
@@ -160,9 +160,9 @@ fi
 test_numeric_arg "${MAX_GENE_LEN}" "MAX_GENE_LEN" "" "Supplied an incorrect value for the maximum gene length, defaulting to estimation from genome size"
 test_numeric_arg "${THREAD_N}" "THREAD_N" 10 "Supplied an incorrect value for the number of CPU threads, defaulting to 10"
 
-#Creating output directory
+#Creating the output directory
 mkdir "${OUT_DIR}"
-check_exit_status "Creating output directory failed"
+check_exit_status "Creating the output directory failed"
 
 #Creating symbolic links
 ln -s -r -t "${OUT_DIR}" "${GENOME}"

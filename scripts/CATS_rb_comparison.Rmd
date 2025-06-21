@@ -39,7 +39,7 @@ VD_COLORS <- unlist(strsplit(ext_args[, args][8], ","))
 MIN_EX_SET_OVL <- as.numeric(ext_args[, args][9])
 MIN_TR_SET_OVL <- as.numeric(ext_args[, args][10])
 UP_COLORS <- unlist(strsplit(ext_args[, args][11], ","))
-COMM_EL_SET_REL_BREAKS <- unlist(strsplit(ext_args[, args][12], ","))
+COMM_EL_SET_REL_BREAKS <- as.numeric(unlist(strsplit(ext_args[, args][12], ",")))
 TP_COLORS <- unlist(strsplit(ext_args[, args][13], ","))
 HP_EL_N <- as.numeric(ext_args[, args][14])
 HP_COLORS <- unlist(strsplit(ext_args[, args][15], ","))
@@ -49,15 +49,15 @@ MIN_EX_ID_PROP <- as.numeric(ext_args[, args][18])
 MIN_EX_LEN <- as.numeric(ext_args[, args][19])
 STRANDED <- as.logical(ext_args[, args][20])
 MAX_INT_LEN <- as.numeric(ext_args[, args][21])
-TR_ALN_PROP_BREAKS <- unlist(strsplit(ext_args[, args][22], ","))
+TR_ALN_PROP_BREAKS <- as.numeric(unlist(strsplit(ext_args[, args][22], ",")))
 STR_INC_ALN_PROP <- as.numeric(ext_args[, args][23])
 STR_INC_MAX_OVL_PROP <- as.numeric(ext_args[, args][24])
-EXON_PER_TR_N_BREAKS <- unlist(strsplit(ext_args[, args][25], ","))
+EXON_PER_TR_N_BREAKS <- as.numeric(unlist(strsplit(ext_args[, args][25], ",")))
 LONGEST_SCAFF_N <- as.numeric(ext_args[, args][26])
 GENOMIC_BIN_N <- as.numeric(ext_args[, args][27])
 MIN_EX_SET_LEN <- as.numeric(ext_args[, args][28])
 MIN_ISO_OVL <- as.numeric(ext_args[, args][29])
-ISO_N_BREAKS <- unlist(strsplit(ext_args[, args][30], ","))
+ISO_N_BREAKS <- as.numeric(unlist(strsplit(ext_args[, args][30], ",")))
 TR_SET_PROX_LEN <- as.numeric(ext_args[, args][31])
 MIN_TR_SET_LEN <- as.numeric(ext_args[, args][32])
 MAX_TR_SET_LEN <- as.numeric(ext_args[, args][33])
@@ -70,22 +70,22 @@ options(scipen = 999)
 
 ```{r include=F}
 #Importing data (function)
-import_data <- function(import_regex, import_category) {
+import_data <- function(import_regex) {
  files_in_directory <- grep(import_regex, list.files(path = "."), value = T)
  files_in_directory <- files_in_directory[sort(as.numeric(sub("%.*", "", files_in_directory)), index.return = T)$ix]
  imported_dt <- list()
- if (import_category == "exon_mappings" | import_category == "tr_lengths") {
+ if (import_regex == "mapped.tsv" | import_regex == "lengths.tsv") {
   for(i in 1 : length(files_in_directory)) {
    imported_dt[[i]] <- fread(files_in_directory[i], header = F)
    imported_dt[[i]][, "full_name" := files_in_directory[i]]
   }
   imported_dt <- rbindlist(imported_dt) 
- } else if (import_category == "general_statistics") {
+ } else if (import_regex == "general_statistics_table.tsv") {
   for (i in 1 : length(files_in_directory)) {
    if (i == 1) {
-    imported_dt <- fread(files_in_directory[i], header = F)
+    imported_dt <- fread(files_in_directory[i], sep = "\t", header = F)
    } else {
-    imported_dt <- cbind(imported_dt, fread(files_in_directory[i], header = F, select = 2))  
+    imported_dt <- cbind(imported_dt, fread(files_in_directory[i], header = F, select = 2, sep = "\t"))  
    }
   }
   colnames(imported_dt)[-1] <- transcriptome_names
@@ -130,9 +130,9 @@ add_missing_transcriptomes <- function(dt_to_adjust, dt_to_add) {
 }
 
 #Generating raincloud plot and descriptive statistics for a numerical variable (function)
-analyse_numerical_variable <- function(dt_to_analyse, variable_to_plot, plot_label_title_filename) {
- plotted_value_min <-  min(dt_to_analyse[, get(variable_to_plot)])
- plotted_value_max <-  quantile(dt_to_analyse[, get(variable_to_plot)], RP_MAX_QUANTILE)
+analyse_numerical_variable <- function(dt_to_analyse, variable_to_plot, plot_axis_title_filename) {
+ plotted_value_min <- dt_to_analyse[, min(.SD[[1]]), .SDcols = variable_to_plot]
+ plotted_value_max <- dt_to_analyse[, quantile(.SD[[1]], RP_MAX_QUANTILE), .SDcols = variable_to_plot]
  all_transcriptomes_in_dt <- unique(dt_to_analyse[, transcriptome])
  if (length(all_transcriptomes_in_dt) != TRANSCRIPTOME_N) {
   dt_to_analyse <- rbindlist(list(dt_to_analyse, data.table(transcriptome = setdiff(transcriptome_names, all_transcriptomes_in_dt))), fill = T)
@@ -140,17 +140,17 @@ analyse_numerical_variable <- function(dt_to_analyse, variable_to_plot, plot_lab
  dt_to_analyse[, "transcriptome" := factor(transcriptome, levels = rev(transcriptome_names))]
  
  variable_rp <- ggplot(data = dt_to_analyse, aes(x = transcriptome, y = .data[[variable_to_plot]], fill = transcriptome)) +
-  stat_halfeye(justification = -0.1, width = 0.95, .width = 0, point_colour = NA, alpha = 0.8) +
+  stat_halfeye(normalize = "groups", width = 0.9, justification = -0.1, .width = 0, point_colour = NA, alpha = 0.8) +
   geom_boxplot(width = 0.1, outlier.shape = NA, alpha = 0.8) +
   theme_bw() +
-  theme(legend.position = "none") +
   scale_fill_manual(values = RP_COLORS) +
+  theme(legend.position = "none") +
   coord_flip() +
   scale_y_log10(limits = c(plotted_value_min, plotted_value_max)) +
   xlab("Transcriptome") +
-  ylab(plot_label_title_filename) +
-  ggtitle(paste(plot_label_title_filename, "distribution"))
- ggsave(variable_rp, filename = paste(tolower(gsub(" ", "_", plot_label_title_filename, fixed =  T)), FIGURE_EXT, sep = "."), height = RP_HEIGHT, width = RP_WIDTH, dpi = FIGURE_DPI)
+  ylab(plot_axis_title_filename) +
+  ggtitle(paste(plot_axis_title_filename, "distribution"))
+ ggsave(variable_rp, filename = paste(tolower(gsub(" ", "_", plot_axis_title_filename, fixed =  T)), FIGURE_EXT, sep = "."), height = RP_HEIGHT, width = RP_WIDTH, dpi = FIGURE_DPI)
  
  dt_to_analyse <- dt_to_analyse[is.na(get(variable_to_plot)) == F]
  if (variable_to_plot != "tr_len") {
@@ -405,7 +405,7 @@ compare_element_sets <- function(element_set_cat) {
  comp_similarity_dt[, "transcriptome1" := factor(transcriptome1, levels = transcriptome_names)]
  comp_similarity_dt[, "transcriptome2" := factor(transcriptome2, levels = transcriptome_names)]
  setorder(comp_similarity_dt, transcriptome1, transcriptome2)
- write.table(comp_similarity_dt, file = paste(sub(" ", "_", element_set_cat, fixed = T), "pairwise_completeness_similarity_matrix.tsv", sep = "_"))
+ write.table(comp_similarity_dt, file = paste(sub(" ", "_", element_set_cat, fixed = T), "pairwise_completeness_similarity_matrix.tsv", sep = "_"), sep = "\t", row.names =  F, col.names = F, quote = F)
  
  element_set_tp <- ggplot(comp_similarity_dt, aes(x = transcriptome1, y = transcriptome2, fill = similarity, label = similarity)) +
   geom_tile(alpha = 0.8) +
@@ -610,15 +610,13 @@ compare_element_set_annot <- function(element_set_cat)  {
 
 ### Outline
 
-This HTML document contains the output of CATS-rb transcriptome assembly comparison tool. For more details on each table and figure, refer to the tool's documentation. In order to customize different plotting parameters, refer to the tool's documentation.
+This HTML document contains the output of CATS-rb transcriptome assembly comparison tool. For more details on each table and figure, refer to the tool's [documentation](https://github.com/bodulic/CATS-rb).
 <br>
 <br>
-
-### General transcriptome assembly statistics
 
 ```{r echo=F, message=F, warning=F}
 #Importing exon mappings from files
-exon_mappings <- import_data("mapped.tsv", "exon_mappings")
+exon_mappings <- import_data("mapped.tsv")
 exon_mappings <- process_filenames(exon_mappings, "_mapped.tsv")
 setnames(exon_mappings, c("tr_name", "scaff_name", "exon_identity", "exon_tr_start", "exon_tr_end", "exon_scaff_start", "exon_scaff_end", "transcriptome")) 
 
@@ -675,12 +673,14 @@ BP2_HEIGHT <- c(5.5, 7, 10, 11, 12, 13, 14, 16, 17, 19, 20, 21, 22, 23)[findInte
 BP2_WIDTH <- BP2_HEIGHT + 2
 
 #Importing general transcriptome assembly statistics from files
-general_trans_stats <- import_data("general_statistics_table.tsv", "general_statistics")
+general_trans_stats <- import_data("general_statistics_table.tsv")
 colnames(general_trans_stats) <- c("Parameter", transcriptome_names)
 
-#Writing full transcriptome assembly statistics to file
+#Writing full general transcriptome assembly statistics to file
 write.table(general_trans_stats, file = "CATS_rb_general_statistics.tsv", sep = "\t", row.names = F, col.names = T, quote = F)
 ```
+
+### General transcriptome assembly statistics
 
 **Table 1.** General transcriptome assembly statistics.
 
@@ -696,7 +696,7 @@ IQR = interquartile range
 ```{r echo=F, message=F, warning=F}
 #Importing transcript lengths from files
 invisible(gc(full = T))
-tr_lengths <- import_data("lengths.tsv", "tr_lengths")
+tr_lengths <- import_data("lengths.tsv")
 tr_lengths <- process_filenames(tr_lengths, "_lengths.tsv")
 setnames(tr_lengths, c("tr_name", "tr_len", "transcriptome"))
 tr_lengths[, "transcriptome" := factor(transcriptome, levels = transcriptome_names)]
@@ -915,7 +915,7 @@ if(STRANDED == F) {
 }
 
 #Writing transcripts whose segments map to disjunct genomic regions to file
-write.table(str_inc_gen_pos_tr, file = "transcripts_disjunct_genomic_region.tsv", sep = "\t", row.names = F, col.names = T, quote = F)
+write.table(str_inc_gen_pos_tr, file = "transcripts_disjunct_genomic_regions.tsv", sep = "\t", row.names = F, col.names = T, quote = F)
 
 #Merging structurally inconsistent transcripts
 str_inc_tr <- unique(rbindlist(list(unmapped_tr, str_inc_aln_prop_tr, str_inc_gen_pos_tr)))
@@ -957,7 +957,7 @@ rm(exon_N_stats)
 per_tr_exon_N[, "tr_name" := sub(".*,trs,", "", tr_name)]
 per_tr_exon_N[, "transcriptome" := factor(transcriptome, levels = transcriptome_names)]
 setorder(per_tr_exon_N, transcriptome, tr_name)
-write.table(per_tr_exon_N, file = "per_transcript_exon_n.tsv", sep = "\t", row.names = F, col.names = T, quote = F)
+write.table(per_tr_exon_N, file = "per_transcript_exon_N.tsv", sep = "\t", row.names = F, col.names = T, quote = F)
 rm(per_tr_exon_N)
 
 #Calculating and plotting exon length
@@ -1322,8 +1322,8 @@ if (TRANSCRIPTOME_N > 1) {
   missing_ex_set_tr_set_pos_bp <- ggplot(data = missing_ex_set_tr_set_pos_dt, aes(x = transcriptome, y = N, fill = category_ovl)) +
    geom_bar(stat = "identity", position = "fill", width = BP_BP3_BAR_WIDTH, color = "black", alpha = 0.8) +
    theme_bw() +
-   theme(legend.position = "top") +
    scale_fill_manual(values = c("firebrick3", "chocolate1"), name = "Position", labels = c("Outside of transcript sets", "Within transcript sets")) +
+   theme(legend.position = "top") +
    xlab("Transcriptome with missing exon sets") +
    ylab("Missing exon set proportion") +
    theme(axis.text.x = element_text(angle = BP_TP_BP3_AXIS_ANGLE, hjust = BP_TP_BP3_AXIS_HJUST, size = BP_HP_GP_BP3_LABEL_SIZE)) +
@@ -1785,7 +1785,7 @@ invisible(gc(full = T))
 GTF_DATA <- ext_args[, args][35]
 MIN_EX_SET_GTF_SET_OVL_PROP <- as.numeric(ext_args[, args][36])
 MIN_TR_SET_GTF_SET_OVL_PROP <- as.numeric(ext_args[, args][37])
-EL_SET_GTF_SET_OVL_PROP_BREAKS <- unlist(strsplit(ext_args[, args][38], ","))
+EL_SET_GTF_SET_OVL_PROP_BREAKS <- as.numeric(unlist(strsplit(ext_args[, args][38], ",")))
 ```
 
 ### Annotation-based analysis

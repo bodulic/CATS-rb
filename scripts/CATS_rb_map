@@ -5,10 +5,10 @@ usage () {
  echo "USAGE ${0} [OPTIONS] GENOME_INDEX_DIR TRANSCRIPTOME" >&2
  echo "Mapping options:" >&2
  echo "-S: Enable stranded mapping, default: off" >&2
- echo "-N: Maximum allowed mappings per transcript, default: 5" >&2
- echo "-i: Minimum intron length (in bp), default: 20 bp" >&2
+ echo "-N: Maximum number of mappings per transcript, default: 5" >&2
+ echo "-i: Minimum intron length (in bp), default: 20" >&2
  echo "-p: Species-specific preset (from path_to_spaln_dir/table/), default: unset" >&2
- echo "-s: Splice site characterization option (0-3, refer to Spaln documentation), default: 2" >&2
+ echo "-s: Splice site characterization option (0-3, refer to documentation), default: 2" >&2
  echo "-P: Relative contribution of coding potential to mapping score, default: 1" >&2
  echo "-T: Relative contribution of translation initiation signal to mapping score, default: 1" >&2
  echo "General options:" >&2
@@ -158,7 +158,7 @@ exec 3>&2
 exec 2> >(tee "$LOG_FILE" >&3)
 
 #Printing welcome message
-echo "Welcome to CATS-rb transcriptome assembly mapping tool (version 1.0.0). Find us on www.github.com/kbodulic.com"
+echo "Welcome to CATS-rb transcriptome assembly mapping tool (version 1.0.0). Find us on https://github.com/bodulic/CATS-rb/tree/main"
 
 #Checking executable requirements
 check_executable R spaln
@@ -179,7 +179,7 @@ check_directories ${GENOME_INDEX_DIR}
 GENOME="$(echo "$(basename "${GENOME_INDEX_DIR}")" | sed 's/CATS_rb_index_//')"
 check_files "${GENOME_INDEX_DIR}"/"${GENOME%.*}".idx "${GENOME_INDEX_DIR}"/"${GENOME%.*}".ent "${GENOME_INDEX_DIR}"/"${GENOME%.*}".bkn "${GENOME_INDEX_DIR}"/"${GENOME%.*}".seq "${GENOME_INDEX_DIR}"/"${GENOME%.*}".grp "$TRANSCRIPTOME"
 
-#Setting the default directory name
+#Setting the default output directory name
 if [[ -z "${OUT_DIR}" ]]
 then
  OUT_DIR="$(basename "${TRANSCRIPTOME}")_CATS_rb_map"
@@ -206,15 +206,15 @@ then
 fi
 
 #Testing numerical arguments
-test_numeric_arg "${SAME_TR_MAP_N}" "SAME_TR_MAP_N" 5 "Supplied an incorrect value for the maximum allowed mappings per transcript, defaulting to 5"
-test_numeric_arg "${MIN_INT_LEN}" "MIN_INT_LEN" 20 "Supplied an incorrect value for the minimum intron length, defaulting to 20 bp"
+test_numeric_arg "${SAME_TR_MAP_N}" "SAME_TR_MAP_N" 5 "Supplied an incorrect value for the maximum number of mappings per transcript, defaulting to 5"
+test_numeric_arg "${MIN_INT_LEN}" "MIN_INT_LEN" 20 "Supplied an incorrect value for the minimum intron length, defaulting to 20"
 test_numeric_arg "${CODING_MAP_CONT}" "CODING_MAP_CONT" 1 "Supplied an incorrect value for the relative contribution of coding potential to mapping score, defaulting to 1"
 test_numeric_arg "${TRANSLATION_MAP_CONT}" "TRANSLATION_MAP_CONT" 1 "Supplied an incorrect value for the relative contribution of translation initiation signal to mapping score, defaulting to 1"
 test_numeric_arg "${THREAD_N}" "THREAD_N" 10 "Supplied an incorrect value for the number of CPU threads, defaulting to 10"
 
-#Creating output directory
+#Creating the output directory
 mkdir "${OUT_DIR}"
-check_exit_status "Creating output directory failed"
+check_exit_status "Creating the output directory failed"
 
 #Creating symbolic links
 EXTENSIONS=("odr" "idx" "ent" "bkn" "seq" "grp")
