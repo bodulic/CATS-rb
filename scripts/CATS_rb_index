@@ -12,7 +12,7 @@ usage () {
  exit 1
 }
 
-#Addingg date and time to log messages (function)
+#Adding date and time to log messages (function)
 write_log () {
  local LOG_TYPE="${1}"
  shift 1
@@ -107,13 +107,13 @@ then
  usage
 fi
 
-#Save log output to file and STDERR
+#Saving log output to file and STDERR
 LOG_FILE="CATS_rb_index_run_$(date '+%Y%m%d_%H%M%S')"
 exec 3>&2
 exec 2> >(tee "$LOG_FILE" >&3)
 
 #Printing welcome message
-echo "Welcome to CATS-rb genome index genertion tool (version 1.0.0). Find us on https://github.com/bodulic/CATS-rb/tree/main"
+echo "Welcome to CATS-rb genome index generation tool (version 1.0.0). Find us on https://github.com/bodulic/CATS-rb/tree/main"
 
 #Checking executable requirements
 check_executable spaln

@@ -49,7 +49,7 @@ usage () {
  exit 1
 }
 
-#Addingg date and time to log messages (function)
+#Adding date and time to log messages (function)
 write_log () {
  local LOG_TYPE="${1}"
  shift 1
@@ -269,7 +269,7 @@ then
  usage
 fi
 
-#Save log output to file and STDERR
+#Saving log output to file and STDERR
 LOG_FILE="CATS_rb_compare_run_$(date '+%Y%m%d_%H%M%S')"
 exec 3>&2
 exec 2> >(tee "$LOG_FILE" >&3)
@@ -335,7 +335,7 @@ test_numeric_arg "${VD_MIN_OVL_PROP}" "VD_MIN_OVL_PROP" 0.35 "Supplied an incorr
 test_numeric_arg "${HP_EL_N}" "HP_EL_N" 5000 "Supplied an incorrect value for the number of longest element sets used in hierarchical clustering, defaulting to 5000"
 test_numeric_arg "${THREAD_N}" "THREAD_N" 10 "Supplied an incorrect value for the number of CPU threads, defaulting to 10"
 
-#Testing numerical arguments (annotatoion-based analysis)
+#Testing numerical arguments (annotation-based analysis)
 if [[ -n "${GTF_DATA}" ]]
 then
  test_numeric_arg "${MIN_EX_SET_GTF_SET_OVL_PROP}" "MIN_EX_SET_GTF_SET_OVL_PROP" 0.35 "Supplied an incorrect value for the minimum proportion of an exon set that must be covered to be considered a match to a GTF exon set, defaulting to 0.35"
@@ -382,7 +382,7 @@ cd "${OUT_DIR}"
 #Writing the script call to file
 echo "${CALL}" > call.log
 
-#Preparing transcriptome asssembly mapping files for comparison
+#Preparing transcriptome assembly mapping files for comparison
 write_log INFO "Preparing transcriptome assembly mapping files for comparison"
 FILE_PATTERNS=("mapped.tsv" "general_statistics_table.tsv" "lengths.tsv")
 COUNTER=1

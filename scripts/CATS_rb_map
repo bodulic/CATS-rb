@@ -19,7 +19,7 @@ usage () {
  exit 1
 }
 
-#Addingg date and time to log messages (function)
+#Adding date and time to log messages (function)
 write_log () {
  local LOG_TYPE="${1}"
  shift 1
@@ -152,7 +152,7 @@ then
  usage
 fi
 
-#Save log output to file and STDERR
+#Saving log output to file and STDERR
 LOG_FILE="CATS_rb_map_run_$(date '+%Y%m%d_%H%M%S')"
 exec 3>&2
 exec 2> >(tee "$LOG_FILE" >&3)
@@ -263,7 +263,7 @@ then
   else
    sed -e "/^>${REMOVE_TRANS}/,+1d" "${TRANSCRIPTOME}_onew_h_$((COUNTER - 1))" > "${TRANSCRIPTOME}_onew_h_${COUNTER}" && rm "${TRANSCRIPTOME}_onew_h_$((COUNTER - 1))"
   fi
-  write_log WARNING "${REMOVE_TRANS} failed to map. retrying without the stated trasncript: ${COUNTER} out of 5 attempts"
+  write_log WARNING "${REMOVE_TRANS} failed to map. retrying without the stated transcript: ${COUNTER} out of 5 attempts"
   spaln -Q7 -S "${STRANDNESS}" -M"${SAME_TR_MAP_N}" -yL "${MIN_INT_LEN}" ${SPECIES} -ya "${SPLICE_OPTION}" -yz "${CODING_MAP_CONT}" -yA "${TRANSLATION_MAP_CONT}" -O 4 -t"${THREAD_N}" -d "${GENOME%.*}" "${TRANSCRIPTOME}_onew_h_${COUNTER}" > "${TRANSCRIPTOME}_mapped_tmp" 2> spaln_log
   if [[ "${?}" -ne 0 && "${COUNTER}" -lt 5 ]]
   then

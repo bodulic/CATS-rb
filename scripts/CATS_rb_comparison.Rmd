@@ -98,10 +98,10 @@ process_filenames <- function(dt_to_process, file_regex) {
  dt_to_process[, "full_name" := sub(file_regex, "", full_name, fixed = T)]
  dt_to_process[, "transcriptome" := sub(".*%", "", full_name)]
  dt_to_process[nchar(transcriptome) > 20, "transcriptome" := substr(transcriptome, 1, 20)]
- dt_to_process[, "occurance_N" := rleid(full_name), by = "transcriptome"]
+ dt_to_process[, "occurrence_N" := rleid(full_name), by = "transcriptome"]
  dt_to_process[, "full_name" := NULL]
- dt_to_process[occurance_N != 1, "transcriptome" := paste(transcriptome, occurance_N, sep = ".")]
- dt_to_process[, "occurance_N" := NULL]
+ dt_to_process[occurrence_N != 1, "transcriptome" := paste(transcriptome, occurrence_N, sep = ".")]
+ dt_to_process[, "occurrence_N" := NULL]
  return(dt_to_process)
 }
 
@@ -345,7 +345,7 @@ compare_element_sets <- function(element_set_cat) {
   element_set_groups[, (transcriptome_names[i]) := fifelse(vapply(transcriptome_paste, function(x) any(transcriptome_names[i] %in% x), FUN.VALUE = T), 1, 0)]
  }
  if(TR_NAME_LEN_MAX <= 7) {
-  cols_to_modify <- colnames(element_set_groups) %cin% c("transcriptome_paste", "length_paste", "length_mean", "length_prop") == F
+  cols_to_modify <- colnames(element_set_groups) %chin% c("transcriptome_paste", "length_paste", "length_mean", "length_prop") == F
   colnames(element_set_groups)[cols_to_modify] <- paste0("       ", colnames(element_set_groups)[cols_to_modify])
  }
  colnames(element_set_groups)[colnames(element_set_groups) == "length_mean"] <- "len"
@@ -1882,7 +1882,7 @@ annot_analysis_stats <- rbindlist(list(annot_analysis_stats, as.list(tr_set_anno
 tr_set_annot_comparison_results[[1]] <- NULL
 
 #Generating annotation-based statistics
-annot_analysis_stat_params <- c("N, % exon sets included in completeness analyses", "N, % matched transcriptome assembly exon sets (exon set precision)", "N, % matched GTF exon sets (exon set recall)", "Proprtion of covered transcriptome assembly exon sets (mean, IQR)", "Annotation-based exon score", "N, % transcript sets included in completeness analyses", "N, % matched transcriptome assembly transcript sets (transcript set precision)", "N, % matched GTF transcript sets (transcript set recall)","Proprtion of covered transcriptome assembly transcript sets (mean, IQR)", "Annotation-based transcript score")
+annot_analysis_stat_params <- c("N, % exon sets included in completeness analyses", "N, % matched transcriptome assembly exon sets (exon set precision)", "N, % matched GTF exon sets (exon set recall)", "Proprtion of covered transcriptome assembly exon sets (mean, IQR)", "Annotation-based exon score", "N, % transcript sets included in completeness analyses", "N, % matched transcriptome assembly transcript sets (transcript set precision)", "N, % matched GTF transcript sets (transcript set recall)","Proportion of covered transcriptome assembly transcript sets (mean, IQR)", "Annotation-based transcript score")
 annot_analysis_stats <- cbind(annot_analysis_stat_params, annot_analysis_stats)
 rm(annot_analysis_stat_params)
 colnames(annot_analysis_stats) <- c("Parameter", transcriptome_names)
