@@ -21,13 +21,13 @@ CATS-rb is the reference-based module of the CATS (Comprehensive Assessment of T
 The main contribution of CATS-rb is transcriptome assembly completeness analysis, which can be performed in two settings: 
 
 - Relative completeness analysis: requires two or more transcriptome assemblies
-- Annotation-based completeness analysis: requires one or more transcriptome assemblies and a reference gene annotation
+- Annotation-based completeness analysis: requires one or more transcriptome assemblies and a reference gene annotation GTF/GFF3 file
 
-Completeness analysis introduces exon and transcript sets as units for assembly comparison, together denoted as element sets. Precisely, CATS-rb collapses overlapping exon and transcript genomic coordinates of a given assembly into non-redundant exon and transcript sets, respectively. Completeness of exon/transcript sets is compared between the analysed assemblies by constructing an undirected graph in which vertices represent exon/transcript sets and edges indicate overlaps between the corresponding sets of the compared assemblies. Overlapping exon/transcript sets are grouped into connected components, with the longest set designated as the group representative.
+Completeness analysis introduces exon and transcript sets as units for assembly comparison, collectively referred to as element sets. Precisely, CATS-rb collapses overlapping exon and transcript genomic coordinates of a given assembly into non-redundant exon and transcript sets, respectively. Completeness of exon/transcript sets is compared between the analysed assemblies by constructing an undirected graph in which vertices represent exon/transcript sets and edges indicate overlaps between the corresponding sets of the compared assemblies. Overlapping exon/transcript sets are grouped into connected components, with the longest set designated as the group representative.
 
-Element set completeness is quantified by its relative length compared to the representative set. Relative exon and transcript scores for each transcriptome assembly are computed as the mean of exon and transcript set completeness, respectively. Alongside completeness scores, CATS-rb also provides an in-depth analysis of missing, common, and unique element sets.
+Element set completeness is quantified by its relative length compared to the representative set. Relative exon and transcript scores for each transcriptome assembly are computed as the mean of exon and transcript set completeness, respectively. Alongside completeness scores, CATS-rb also provides an in-depth analysis and visualization of missing, common, and unique element sets.
 
-Additionally, CATS-rb can perform an annotation-based analysis using element sets derived from a GTF file. This workflow follows the same principles as relative completeness analysis, while grouping element sets based on overlaps with GTF sets. As such, GTF sets are considered the representative for each set group. Annotation-based exon and transcript scores are calculated analogously to relative exon and transcript scores, offering an absolute measure of assembly completeness.
+Additionally, CATS-rb can perform an annotation-based analysis using element sets derived from a GTF file. This workflow follows the same principles as relative completeness analysis, while grouping element sets based on shared overlaps with GTF sets. As such, GTF sets are considered the representative for each set group. Annotation-based exon and transcript scores are calculated analogously to relative exon and transcript scores, offering an absolute measure of assembly completeness.
 
 CATS-rb exon and transcript scores exhibit a strong correlation with transcriptome assembly quality. Furthermore, relative and annotation-based scores are strongly correlated when applied to assembly sets with varying quality, enabling precise assembly quality assessment without strictly requiring reference annotation. 
 
@@ -52,7 +52,7 @@ For the best compatibility and performance, we recommend running CATS-rb on:
 - WSL (i.e. Ubuntu on Windows)
 
 ### MacOS
-If you are using MacOS, Bash (version >= 4.0) and GNU versions of core utilities are required. In this case, `PATH` variable should be adjusted so that CATS-rb uses GNU versions of core utilities:
+If you are using MacOS, Bash (version >= 4.0) and GNU versions of core utilities are required. In this case, the `PATH` environment variable should be adjusted so that CATS-rb uses GNU versions of core utilities:
 
 - Install Bash ≥ 4.0 via [Homebrew](https://formulae.brew.sh/formula/bash):
 
@@ -96,29 +96,27 @@ bash CATS_rb
 
 CATS-rb and its dependencies can be directly installed via [Bioconda](https://bioconda.github.io/):
 
-```bash
-conda install -c bioconda cats_rb
-```
+(coming soon)
 
 ## Installing CATS-rb from source
 
-CATS-rb consists of Bash and R scripts located in the `scripts` directory of this repository. After cloning the repository, all CATS-rb scripts must be included in the `PATH` environment variable. 
+CATS-rb consists of Bash and R scripts located in the `scripts` directory of this repository. After cloning the repository, all CATS-rb scripts must be included in `PATH`.
 
 The following dependencies are required:
 
 | **Dependency**           | **Tested Version** | **Homepage**                                                                    | **Conda Installation**                                        | **R installation**                             |
 |--------------------------|--------------------|---------------------------------------------------------------------------------|---------------------------------------------------------------|------------------------------------------------|
 | spaln                    | 3.0.1              | https://github.com/ogotoh/spaln                                                 | `conda install -c bioconda spaln`                             | /                                              | 
-| R                        | 4.4.2              | https://www.r-project.org/                                                      | `conda install conda-forge::r-base`                           | /                                              |
-| knitr (R)                | 1.49               | https://cran.r-project.org/web/packages/knitr/                                  | `conda install conda-forge::r-knitr`                          | `install.packages("knitr")`                    |
+| R                        | 4.4.2              | https://www.r-project.org                                                       | `conda install conda-forge::r-base`                           | /                                              |
+| knitr (R)                | 1.49               | https://cran.r-project.org/web/packages/knitr                                   | `conda install conda-forge::r-knitr`                          | `install.packages("knitr")`                    |
 | data.table (R)           | 1.16.4             | https://cran.r-project.org/package=data.table                                   | `conda install conda-forge::r-data.table`                     | `install.packages("data.table")`               |
-| ggplot2 (R)              | 3.5.1              | https://cran.r-project.org/web/packages/ggplot2/                                | `conda install conda-forge::r-ggplot2`                        | `install.packages("ggplot2")`                  |
-| ggdist (R)               | 3.3.2              | https://cran.r-project.org/web/packages/ggdist/                                 | `conda install conda-forge::r-ggdist`                         | `install.packages("ggdist")`                   | 
+| ggplot2 (R)              | 3.5.1              | https://cran.r-project.org/web/packages/ggplot2                                 | `conda install conda-forge::r-ggplot2`                        | `install.packages("ggplot2")`                  |
+| ggdist (R)               | 3.3.2              | https://cran.r-project.org/web/packages/ggdist                                  | `conda install conda-forge::r-ggdist`                         | `install.packages("ggdist")`                   | 
 | GenomicRanges (R)        | 1.56.2             | https://bioconductor.org/packages/devel/bioc/html/GenomicRanges.html            | `conda install -c bioconda bioconductor-genomicranges`        | `BiocManager::install("GenomicRanges")`        | 
-| Matrix (R)               | 1.7.1              | https://cran.r-project.org/web/packages/Matrix/                                 | `conda install conda-forge::r-matrix`                         | `install.packages("Matrix")`                   |
-| igraph (R)               | 4.4.2              | https://cran.r-project.org/web/packages/igraph/                                 | `conda install conda-forge::igraph`                           | `install.packages("igraph")`                   |
-| UpSetR (R)               | 2.1.3              | https://cran.r-project.org/web/packages/UpSetR/                                 | `conda install conda-forge::r-upsetr`                         | `install.packages("UpSetR")`                   |
-| ggVennDiagram (R)        | 1.5.2              | https://cran.r-project.org/web/packages/ggVennDiagram/                          | /                                                             | `install.packages("ggVennDiagram")`            |
+| Matrix (R)               | 1.7.1              | https://cran.r-project.org/web/packages/Matrix                                  | `conda install conda-forge::r-matrix`                         | `install.packages("Matrix")`                   |
+| igraph (R)               | 4.4.2              | https://cran.r-project.org/web/packages/igraph                                  | `conda install conda-forge::igraph`                           | `install.packages("igraph")`                   |
+| UpSetR (R)               | 2.1.3              | https://cran.r-project.org/web/packages/UpSetR                                  | `conda install conda-forge::r-upsetr`                         | `install.packages("UpSetR")`                   |
+| ggVennDiagram (R)        | 1.5.2              | https://cran.r-project.org/web/packages/ggVennDiagram                           | /                                                             | `install.packages("ggVennDiagram")`            |
 | egg (R)                  | 0.4.5              | https://cran.r-project.org/web/packages/egg/index.html                          | `conda install conda-forge::r-egg`                            | `install.packages("egg")`                      |
 | ComplexHeatmap (R)       | 2.20.0             | https://www.bioconductor.org/packages/devel/bioc/html/ComplexHeatmap.html       | `conda install -c bioconda bioconductor-complexheatmap`       | `BiocManager::install("ComplexHeatmap")`       |
 | GenomicDistributions (R) | 1.12.0             | https://www.bioconductor.org/packages/devel/bioc/html/GenomicDistributions.html | `conda install -c bioconda bioconductor-genomicdistributions` | `BiocManager::install("GenomicDistributions")` |
@@ -135,7 +133,7 @@ CATS-rb workflow consists of three scripts which should be run in succession:
 
 ## Genome index generation script: `CATS_rb_index`
 
-`CATS_rb_index` generates the Spaln genome index for the reference genome.
+`CATS_rb_index` generates the Spaln genome index for the reference genome. The reference genome does not need to be repeat-masked.
 
 Example usage:
 ```bash
@@ -183,7 +181,7 @@ The value of `m` should be adjusted according to the analysed species.
 
 Spaln genome index generation is parallelized. Recommended number of threads: 10-20.
 
-`-O`: Overwrite the genome index directory, default: off" 
+`-O`: Overwrite the genome index directory, default: off 
 
 `-h`: Show usage information"
 
@@ -197,7 +195,7 @@ Stranded mapping restricts Spaln to align transcripts in their native 5′ to 3�
 
 `-N`: Maximum number of mappings per transcript, default: 5
 
-The value of `N` should be increased when analyzing species with complex genomes that contain many paralogous genes, and decreased for smaller or less complex genomes.
+The value of `N` should be increased when analyzing species with complex genomes that contain a high number of paralogous genes, and decreased for smaller or less complex genomes.
 
 `-i`: Minimum intron length (in bp), default: 20
 
@@ -374,6 +372,8 @@ Several steps of CATS-rb transcriptome assembly comparison are parallelized. Thi
 The analysis is summarized in the `CATS_rb_comparison.html` HTML file. 
 An example of the HTML output is provided [here](CATS_rb_output_example.html)
 
+Note on transcriptome assembly order and names: Assemblies will appear in the order they were provided on the command line when running the tool. For visualization purposes, assembly names are limited to a maximum of 20 characters; names exceeding this limit will be truncated. If multiple assemblies share the same name, a numeric suffix (e.g., .1, .2, etc.) will be appended to distinguish these assemblies.
+
 ## Summary tables
 
 CATS-rb produces several summary files encompassing transcriptome assembly length statistics, various mapping metrics, and completeness analysis results:
@@ -448,9 +448,9 @@ CATS-rb also produces several .tsv files containing detailed per-transcript and 
 
 `exon_sets.tsv` and `transcript_sets.tsv` contain exon/transcript set coordinates.
 
-`unique_exon_sets.tsv` and `unique_transcript_sets.tsv` contain unique eoxn/transcript set coordinates.
+`unique_exon_sets.tsv` and `unique_transcript_sets.tsv` contain unique exon/transcript set coordinates.
 
-`missing_exon_set_ranges.tsv` contains genomic coordinate ranges of missing exon sets identified in other transcriptome assemblies. Range coordinates are defined by taking the range from minimum to maximum coordinate of the exon set group in all assemblies in which the set was found.
+`missing_exon_set_ranges.tsv` contains genomic coordinate ranges of missing exon sets identified in other transcriptome assemblies. Range coordinates are defined by taking the range from minimum to maximum genomic coordinate of the exon set group in all assemblies in which the set was found.
 
 `exon_set_pairwise_completeness_similarity_matrix.tsv` and `transcript_set_pairwise_completeness_similarity_matrix.tsv` contain exon/transcript set pairwise completeness similarity between the analysed transcriptome assemblies. Completeness similarity is defined as the mean completeness ratio of each corresponding exon/transcript set between each assembly pair.
 
@@ -462,7 +462,7 @@ Copyright © 2025 Kristian Bodulić
 
 if you use CATS, please cite the CATS preprint:
 
-(add reference)
+(coming soon)
 
 # Troubleshooting
 
@@ -470,4 +470,4 @@ Please report all potential bugs in the Issues tracker.
 
 # Changelog
 
-Version 1.0.0. Initial commit, June 5, 2025.
+Version 1.0.0. Initial commit, July 10, 2025.
