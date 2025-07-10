@@ -1,5 +1,4 @@
 *.html linguist-documentation=true
-*.md linguist-documentation=true
 *.tsv linguist-documentation=true
 *.csv linguist-documentation=true
 *.txt linguist-documentation=true
