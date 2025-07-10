@@ -231,7 +231,6 @@ echo "${CALL}" > call.log
 
 #Cleaning up transcript headers
 sed -r 's/^(>\S+)\s.*/\1/' "${TRANSCRIPTOME}" > "${TRANSCRIPTOME}_onew_h"
-rm "${TRANSCRIPTOME}"
 
 #Calculating general transcriptome assembly statistics
 write_log INFO "Calculating general transcriptome assembly statistics"

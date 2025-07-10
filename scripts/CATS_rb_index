@@ -184,7 +184,7 @@ spaln -W -KD -XG"${MAX_GENE_LEN}" -t"${THREAD_N}" "${GENOME_NEW}" &> spaln_index
 check_exit_status "Building the genome index failed. Check the spaln_index_log file"
 
 #Cleaning up
-rm "${GENOME_NEW}" spaln_index_log
+rm spaln_index_log
 
 #Exiting
 write_log INFO "Thank you for using CATS-rb! The genome index can be found in ${OUT_DIR}"
