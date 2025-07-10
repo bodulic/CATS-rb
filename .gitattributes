@@ -1,0 +1,13 @@
+*.html linguist-documentation=true
+*.md linguist-documentation=true
+*.tsv linguist-documentation=true
+*.csv linguist-documentation=true
+*.txt linguist-documentation=true
+
+*.gz linguist-generated=true
+*.zip linguist-generated=true
+*.tar linguist-generated=true
+
+*.R linguist-language=R
+*.bash linguist-language=Shell
+*.sh linguist-language=Shell
