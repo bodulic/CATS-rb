@@ -8,5 +8,6 @@
 *.tar linguist-generated=true
 
 *.R linguist-language=R
+*.Rmd linguist-language=R
 *.bash linguist-language=Shell
 *.sh linguist-language=Shell
