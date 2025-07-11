@@ -31,7 +31,7 @@ Additionally, CATS-rb can perform an annotation-based analysis using element set
 
 CATS-rb exon and transcript scores exhibit a strong correlation with transcriptome assembly quality. Furthermore, relative and annotation-based scores are strongly correlated when applied to assembly sets with varying quality, enabling precise assembly quality assessment without strictly requiring reference annotation. 
 
-For detailed benchmarks and methodology, please refer to the CATS [preprint](test)
+For detailed benchmarks and methodology, please refer to the CATS [preprint](test) (coming soon)
 
 ## Use cases
 
@@ -463,7 +463,7 @@ CATS is an academic software distributed under the MIT license.
 
 Copyright © 2025 Kristian Bodulić
 
-if you use CATS, please cite the CATS preprint:
+if you use CATS, please cite the CATS [preprint](test):
 
 (coming soon)
 
