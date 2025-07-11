@@ -184,6 +184,7 @@ spaln -W -KD -XG"${MAX_GENE_LEN}" -t"${THREAD_N}" "${GENOME_NEW}" &> spaln_index
 check_exit_status "Building the genome index failed. Check the spaln_index_log file"
 
 #Cleaning up
+[[ -L "${GENOME_NEW}" ]] && rm "${GENOME_NEW}"
 rm spaln_index_log
 
 #Exiting

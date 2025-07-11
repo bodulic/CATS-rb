@@ -404,6 +404,7 @@ do
   fi
  done
  cd ..
+ [[ -L "${DIRECTORY}" ]] && rm "${DIRECTORY}"
  mv "${DIRECTORY}_tmpdir/"* .
  rm -r "${DIRECTORY}_tmpdir"
  ((COUNTER=COUNTER+1))
@@ -412,6 +413,7 @@ done
 #Calculating genomic scaffold lengths
 write_log INFO "Calculating genomic scaffold lengths"
 sed -r 's/^(>\S+)\s.*/\1/' "${GENOME}" > "${GENOME}_onew_h"
+[[ -L "${GENOME}" ]] && rm "${GENOME}"
 awk '/^>/ { if (seq) print name "\t" length(seq); name = substr($0, 2); seq = ""; next } { seq = seq $0 } END { print name "\t" length(seq) }' "${GENOME}_onew_h" > scaff_lengths && rm "${GENOME}_onew_h"
 
 #Setting the number of longest genomic scaffolds for genomic location plotting of exon sets
@@ -435,10 +437,14 @@ cp $(which CATS_rb_comparison.Rmd) .
 
 #Comparing transcriptome assemblies
 Rscript -e "rmarkdown::render(input='CATS_rb_comparison.Rmd',output_file='CATS_rb_comparison.html')"
-check_exit_status "Transcriptome assembly comparison failed"„
+check_exit_status "Transcriptome assembly comparison failed"
 
 #Cleaning up
 rm *"mapped.tsv" *"general_statistics_table.tsv" *"lengths.tsv" scaff_lengths ext_args CATS_rb_comparison.Rmd
+if [[ -n "${GTF_DATA}" ]]
+then
+ [[ -L "${GTF_DATA}" ]] && rm "${GTF_DATA}"
+fi
 
 #Exiting
 write_log INFO "Thank you for using CATS-rb! The CATS-rb transcriptome assembly comparison output can be found in ${OUT_DIR}"
