@@ -131,6 +131,9 @@ test_numeric_arg () {
  fi
 }
 
+#Checking executable requirements
+check_executable Rscript
+
 #Defining default parameters
 STRANDED="F"
 MIN_EX_ID_PROP=0.98
@@ -275,9 +278,6 @@ exec 2> >(tee "$LOG_FILE" >&3)
 
 #Printing welcome message
 echo "Welcome to CATS-rb transcriptome assembly comparison tool (version 1.0.0). Find us on https://github.com/bodulic/CATS-rb/tree/main"
-
-#Checking executable requirements
-check_executable Rscript
 
 #Checking if the correct number of files / directories is supplied
 if [[ "${#}" -lt 2 ]]

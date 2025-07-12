@@ -76,6 +76,9 @@ test_numeric_arg () {
  fi
 }
 
+#Checking executable requirements
+check_executable spaln
+
 #Defining default parameters
 THREAD_N=10
 OVERWRITE_RES="F"
@@ -113,9 +116,6 @@ exec 2> >(tee "$LOG_FILE" >&3)
 
 #Printing welcome message
 echo "Welcome to CATS-rb genome index generation tool (version 1.0.0). Find us on https://github.com/bodulic/CATS-rb/tree/main"
-
-#Checking executable requirements
-check_executable spaln
 
 #Checking if the correct number of files is supplied
 if [[ "${#}" -ne 1 ]]
