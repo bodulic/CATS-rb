@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #Defining usage and exiting (function)
 usage () {
  echo "CATS-rb version 1.0.0 - genome index generation script" >&2
