@@ -554,7 +554,7 @@ compare_element_set_annot <- function(element_set_cat)  {
  }
  gtf_set_ovl_prop_dt[is.na(gtf_set_ovl_prop_dt)] <- 0
  setnames(gtf_set_ovl_prop_dt, transcriptome_names)
- write.table(cbind(gtf_set_ids, gtf_set_ovl_prop_dt), file = paste(sub(" ", "_", element_set_cat, fixed = T), "annotation_based_matrix.tsv", sep = "_"), sep = "\t", row.names = F, col.names = T, quote = F)  
+ write.table(cbind(gtf_set_ids, gtf_set_ovl_prop_dt), file = paste(sub(" ", "_", element_set_cat, fixed = T), "annotation_based_comp_matrix.tsv", sep = "_"), sep = "\t", row.names = F, col.names = T, quote = F)  
  rm(gtf_set_ids)
  annot_el_scores <- round(as.numeric(colMeans(gtf_set_ovl_prop_dt)), 3)
  
@@ -1827,6 +1827,11 @@ if (length(gtf_exon_set_gr) == 0) {
 gtf_exon_set_gr <- gtf_exon_set_gr[order(-width(gtf_exon_set_gr))]
 mcols(gtf_exon_set_gr)$gtf_set_id <- 1 : length(gtf_exon_set_gr)
 
+#Writing annotation-based exon set coordinates to file
+gtf_exon_set_dt <- as.data.table(gtf_exon_set_gr)[, !c("strand")]
+write.table(gtf_exon_set_dt, file = "annotation_based_exon_set_coordinates.tsv", sep = "\t", row.names = F, col.names = T, quote = F)
+rm(gtf_exon_set_dt)
+
 #Defining GTF transcript sets
 gtf_transcript_set_gr <- reduce(makeGRangesFromDataFrame(gtf_data[feature_type == "transcript"], seqnames.field = "scaff_name_gtf", start.field = "scaff_start_gtf", end.field = "scaff_end_gtf", ignore.strand = T, keep.extra.columns = F), min.gapwidth = 0)
 rm(gtf_data)
@@ -1837,6 +1842,11 @@ if (length(gtf_transcript_set_gr) == 0) {
 }
 gtf_transcript_set_gr <- gtf_transcript_set_gr[order(-width(gtf_transcript_set_gr))]
 mcols(gtf_transcript_set_gr)$gtf_set_id <- 1 : length(gtf_transcript_set_gr)
+
+#Writing annotation-based transcript set coordinates to file
+gtf_transcript_set_dt <- as.data.table(gtf_transcript_set_gr)[, !c("strand")]
+write.table(gtf_transcript_set_dt, file = "annotation_based_transcript_set_coordinates.tsv", sep = "\t", row.names = F, col.names = T, quote = F)
+rm(gtf_transcript_set_dt)
 
 #Performing annotation-based exon set analysis
 ex_set_annot_comparison_results <- compare_element_set_annot("exon set")
