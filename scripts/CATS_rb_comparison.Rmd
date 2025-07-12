@@ -1828,7 +1828,8 @@ gtf_exon_set_gr <- gtf_exon_set_gr[order(-width(gtf_exon_set_gr))]
 mcols(gtf_exon_set_gr)$gtf_set_id <- 1 : length(gtf_exon_set_gr)
 
 #Writing annotation-based exon set coordinates to file
-gtf_exon_set_dt <- as.data.table(gtf_exon_set_gr)[, !c("strand")]
+gtf_exon_set_dt <- as.data.table(gtf_exon_set_gr)[, .(gtf_set_id, seqnames, start, end)]
+setnames(gtf_exon_set_dt, c("set_id", "scaff", "scaff_start", "scaff_end"))
 write.table(gtf_exon_set_dt, file = "annotation_based_exon_set_coordinates.tsv", sep = "\t", row.names = F, col.names = T, quote = F)
 rm(gtf_exon_set_dt)
 
@@ -1844,7 +1845,8 @@ gtf_transcript_set_gr <- gtf_transcript_set_gr[order(-width(gtf_transcript_set_g
 mcols(gtf_transcript_set_gr)$gtf_set_id <- 1 : length(gtf_transcript_set_gr)
 
 #Writing annotation-based transcript set coordinates to file
-gtf_transcript_set_dt <- as.data.table(gtf_transcript_set_gr)[, !c("strand")]
+gtf_transcript_set_dt <- as.data.table(gtf_transcript_set_gr)[, .(gtf_set_id, seqnames, start, end)]
+setnames(gtf_transcript_set_dt, c("set_id", "scaff", "scaff_start", "scaff_end"))
 write.table(gtf_transcript_set_dt, file = "annotation_based_transcript_set_coordinates.tsv", sep = "\t", row.names = F, col.names = T, quote = F)
 rm(gtf_transcript_set_dt)
 
