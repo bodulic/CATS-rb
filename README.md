@@ -27,7 +27,7 @@ Completeness analysis introduces exon and transcript sets as units for assembly 
 
 Element set completeness is quantified by its relative length compared to the representative set. Relative exon and transcript scores for each transcriptome assembly are computed as the mean of exon and transcript set completeness, respectively. Alongside completeness scores, CATS-rb also provides an in-depth analysis and visualization of missing, common, and unique element sets.
 
-Additionally, CATS-rb can perform an annotation-based analysis using element sets derived from a GTF file. This workflow follows the same principles as relative completeness analysis, while grouping element sets based on shared overlaps with GTF sets. As such, GTF sets are considered the representative for each set group. Annotation-based exon and transcript scores are calculated analogously to relative exon and transcript scores, offering an absolute measure of assembly completeness.
+Additionally, CATS-rb can perform an annotation-based analysis using reference element sets derived from a GTF genome annotation file. This workflow follows the same principles as relative completeness analysis, while grouping transcriptome assembly element sets based on shared overlaps with reference sets. As such, reference sets are considered the representative for each set assembly set group. Annotation-based exon and transcript scores are calculated analogously to relative exon and transcript scores, offering an absolute measure of assembly completeness.
 
 CATS-rb exon and transcript scores exhibit a strong correlation with transcriptome assembly quality. Furthermore, relative and annotation-based scores are strongly correlated when applied to assembly sets with varying quality, enabling precise assembly quality assessment without strictly requiring reference annotation. 
 
@@ -456,6 +456,10 @@ CATS-rb also produces several .tsv files containing detailed per-transcript and 
 `missing_exon_set_ranges.tsv` contains genomic coordinate ranges of missing exon sets identified in other transcriptome assemblies. Range coordinates are defined by taking the range from minimum to maximum genomic coordinate of the exon set group in all assemblies in which the set was found.
 
 `exon_set_pairwise_completeness_similarity_matrix.tsv` and `transcript_set_pairwise_completeness_similarity_matrix.tsv` contain exon/transcript set pairwise completeness similarity between the analysed transcriptome assemblies. Completeness similarity is defined as the mean completeness ratio of each corresponding exon/transcript set between each assembly pair.
+
+`annotation_based_exon_set_coordinates.tsv` amd `annotation_based_transcript_set_coordinates.tsv` contain annotation-based exon/transcript set coordinates.
+
+`exon_set_annotation_based_comp_matrix.tsv` and `transcript_set_annotation_based_comp_matrix.tsv` contain the completeness of exon/transcript sets relative to the GTF reference set.
 
 # Citation
 
