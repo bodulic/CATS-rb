@@ -9,7 +9,7 @@ usage () {
  echo "-t: Number of CPU threads, default: 10" >&2
  echo "-O: Overwrite the genome index directory, default: off" >&2
  echo "-h: Show usage information" >&2
- exit 1
+ exit 0
 }
 
 #Adding date and time to log messages (function)
@@ -95,7 +95,6 @@ while getopts ":m:t:Oh" OPT; do
   h) usage
      ;;
   ?) write_log ERROR "Unknown flag supplied: -${OPTARG}"
-     usage
      ;;
  esac
 done

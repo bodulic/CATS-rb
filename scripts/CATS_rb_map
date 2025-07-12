@@ -16,7 +16,7 @@ usage () {
  echo "-D: Mapping output directory name, default: TRANSCRIPTOME_CATS_rb_map" >&2
  echo "-O: Overwrite the mapping output directory, default: off" >&2
  echo "-h: Show usage information" >&2
- exit 1
+ exit 0
 }
 
 #Adding date and time to log messages (function)
@@ -140,7 +140,6 @@ while getopts ":SN:i:p:s:P:T:t:D:Oh" OPT; do
   h) usage
      ;;
   ?) write_log ERROR "Unknown flag supplied: -${OPTARG}"
-     usage
      ;;
  esac
 done

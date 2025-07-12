@@ -46,7 +46,7 @@ usage () {
  echo "-D: Comparison output directory name, default: CATS_rb_comparison" >&2
  echo "-O: Overwrite the comparison output directory, default: off" >&2
  echo "-h: Show usage information" >&2
- exit 1
+ exit 0
 }
 
 #Adding date and time to log messages (function)
@@ -257,7 +257,6 @@ while getopts ":Sp:e:i:M:C:l:L:m:j:J:o:P:x:d:r:b:n:u:v:y:c:q:f:B:V:H:EA:N:R:I:F:
   h) usage
      ;;
   ?) write_log ERROR "Unknown flag supplied: -${OPTARG}"
-     usage
      ;;
  esac
 done
