@@ -226,7 +226,7 @@ TRANSCRIPTOME="$(basename "${TRANSCRIPTOME}")"
 cd "${OUT_DIR}"
 
 #Writing the script call to file
-echo "${CALL}" > call.log
+echo "${CALL}" > call_log
 
 #Cleaning up transcript headers
 sed -r 's/^(>\S+)\s.*/\1/' "${TRANSCRIPTOME}" > "${TRANSCRIPTOME}_onew_h"
@@ -237,7 +237,6 @@ write_log INFO "Calculating general transcriptome assembly statistics"
 awk '/^>/ { if (seq) print name "\t" length(seq); name = substr($0, 2); seq = ""; next } { seq = seq $0 } END { print name "\t" length(seq) }' "${TRANSCRIPTOME}_onew_h" > "${TRANSCRIPTOME}_lengths.tsv"
 CATS_general_assembly_stats.R "${THREAD_N}" "${TRANSCRIPTOME}_lengths.tsv" "${TRANSCRIPTOME}" 2> general_assembly_stats_log
 check_exit_status "General transcriptome assembly statistics calculation failed. Check the general_assembly_stats_log file"
-rm general_assembly_stats_log
 
 GC_CONTENT="$(awk '!/^>/ { gc_con += gsub(/[cCgG]/, ""); at_con += gsub(/[tTaA]/, ""); } END { printf "%.2f%%\n", (100 * gc_con) / (gc_con + at_con); }' "${TRANSCRIPTOME}_onew_h")"
 echo -e "GC content (%)\t${GC_CONTENT}" >> "${TRANSCRIPTOME}_general_statistics_table.tsv"
@@ -254,7 +253,7 @@ then
  do
   if ! [[ -s "${TRANSCRIPTOME}_mapped_tmp" ]]
   then
-   write_log ERROR "Transcriptome assembly failed to map. Check the spaln_log file and refer to CATS-rb documentation"
+   write_log ERROR "Transcriptome assembly failed to map. Check the spaln_log file"
    exit 1
   fi
   REMOVE_TRANS="$(cat "${TRANSCRIPTOME}_mapped_tmp" | sed '/^@/d;/^#/d' |  awk -F'\t' 'END{print $1}')"
@@ -271,7 +270,7 @@ then
    ((COUNTER=COUNTER+1))
   elif [[ "${?}" -ne 0 && "${COUNTER}" -eq 5 ]]
   then
-   write_log ERROR "Transcriptome assembly failed to map. Check the spaln_log file and refer to CATS-rb documentation"
+   write_log ERROR "Transcriptome assembly failed to map. Check the spaln_log file"
    exit 1
   else
    MAPPED="T"
@@ -285,7 +284,11 @@ cat "${TRANSCRIPTOME}_mapped_tmp" | sed '/^@/d;/^#/d' | awk 'NF > 1' | cut -f 1,
 
 #Cleaning up
 rm "${GENOME%.*}".odr "${GENOME%.*}".idx "${GENOME%.*}".ent "${GENOME%.*}".bkn "${GENOME%.*}".seq "${GENOME%.*}".grp 2> /dev/null
-rm "${TRANSCRIPTOME}_onew_h" "${TRANSCRIPTOME}_mapped_tmp" spaln_log
+rm "${TRANSCRIPTOME}_onew_h" "${TRANSCRIPTOME}_mapped_tmp"
+
+#Moving logs into a separate directory
+mkdir logs
+mv call_log general_assembly_stats_log spaln_log logs
 
 #Exiting
 write_log INFO "Thank you for using CATS-rb! The transcriptome assembly mapping output can be found in ${OUT_DIR}"

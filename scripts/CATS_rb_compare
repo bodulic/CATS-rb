@@ -379,7 +379,7 @@ fi
 cd "${OUT_DIR}"
 
 #Writing the script call to file
-echo "${CALL}" > call.log
+echo "${CALL}" > call_log
 
 #Preparing transcriptome assembly mapping files for comparison
 write_log INFO "Preparing transcriptome assembly mapping files for comparison"
@@ -435,8 +435,8 @@ fi
 cp $(which CATS_rb_comparison.Rmd) .
 
 #Comparing transcriptome assemblies
-Rscript -e "rmarkdown::render(input='CATS_rb_comparison.Rmd',output_file='CATS_rb_comparison.html')"
-check_exit_status "Transcriptome assembly comparison failed"
+Rscript -e "rmarkdown::render(input='CATS_rb_comparison.Rmd',output_file='CATS_rb_comparison.html')" 2> cats_rb_compare_log
+check_exit_status "Transcriptome assembly comparison failed. Check the cats_rb_compare_log file"
 
 #Cleaning up
 rm *"mapped.tsv" *"general_statistics_table.tsv" *"lengths.tsv" scaff_lengths ext_args CATS_rb_comparison.Rmd
@@ -444,6 +444,10 @@ if [[ -n "${GTF_DATA}" ]]
 then
  [[ -L "${GTF_DATA}" ]] && rm "${GTF_DATA}"
 fi
+
+#Moving logs into a separate directory
+mkdir logs
+mv call_log cats_rb_compare_log logs
 
 #Exiting
 write_log INFO "Thank you for using CATS-rb! The CATS-rb transcriptome assembly comparison output can be found in ${OUT_DIR}"

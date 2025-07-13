@@ -169,7 +169,7 @@ GENOME="$(basename "${GENOME}")"
 cd "${OUT_DIR}"
 
 #Writing the script call to file
-echo "${CALL}" > call.log
+echo "${CALL}" > call_log
 
 #Adjusting the genome name
 if [[ "${GENOME}" != "${GENOME_NEW}" ]]
@@ -184,7 +184,10 @@ check_exit_status "Building the genome index failed. Check the spaln_index_log f
 
 #Cleaning up
 [[ -L "${GENOME_NEW}" ]] && rm "${GENOME_NEW}"
-rm spaln_index_log
+
+#Moving logs into a separate directory
+mkdir logs
+mv call_log spaln_index_log logs
 
 #Exiting
 write_log INFO "Thank you for using CATS-rb! The genome index can be found in ${OUT_DIR}"
