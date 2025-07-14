@@ -24,6 +24,7 @@ suppressPackageStartupMessages(library(UpSetR))
 suppressPackageStartupMessages(library(ggVennDiagram))
 suppressPackageStartupMessages(library(egg))
 suppressPackageStartupMessages(library(ComplexHeatmap))
+suppressPackageStartupMessages(library(GenomeInfoDb))
 suppressPackageStartupMessages(library(GenomicDistributions))
 
 #Defining external arguments

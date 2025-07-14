@@ -39,6 +39,17 @@ check_executable () {
  done
 }
 
+#Checking R package installation (function)
+check_r_package() {
+ for R_PACKAGE in "${@}"
+ do
+  Rscript -e "if (!requireNamespace('${R_PACKAGE}', quietly=T)) quit(status=1)" >/dev/null 2>&1 || {
+   write_log ERROR "R package ${R_PACKAGE} could not be found"
+   exit 1
+  }
+ done
+}
+
 #Checking the supplied directories (function)
 check_directories() {
  for DIRECTORY in "${@}"
@@ -102,7 +113,10 @@ test_numeric_arg () {
 }
 
 #Checking executable requirements
-check_executable R spaln
+check_executable Rscript spaln
+
+#Checking R package requirements
+check_r_package data.table
 
 #Defining default parameters
 STRANDNESS=3

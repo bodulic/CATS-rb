@@ -69,6 +69,17 @@ check_executable () {
  done
 }
 
+#Checking R package installation (function)
+check_r_package() {
+ for R_PACKAGE in "${@}"
+ do
+  Rscript -e "if (!requireNamespace('${R_PACKAGE}', quietly=T)) quit(status=1)" >/dev/null 2>&1 || {
+   write_log ERROR "R package ${R_PACKAGE} could not be found"
+   exit 1
+  }
+ done
+}
+
 #Checking the supplied files (function)
 check_files() {
  for FILE in "${@}"
@@ -132,7 +143,10 @@ test_numeric_arg () {
 }
 
 #Checking executable requirements
-check_executable Rscript
+check_executable Rscript pandoc
+
+#Checking R package requirements
+check_r_package rmarkdown knitr data.table ggplot2 ggdist GenomicRanges Matrix igraph UpSetR ggVennDiagram egg ComplexHeatmap GenomeInfoDb GenomicDistributions
 
 #Defining default parameters
 STRANDED="F"
