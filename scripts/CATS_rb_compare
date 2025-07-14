@@ -363,7 +363,7 @@ then
 fi
 
 #Checking the RP_MAX_QUANTILE argument
-if awk -v num="${RP_MAX_QUANTILE}" 'BEGIN {exit !(num > 1)}'
+if gawk -v num="${RP_MAX_QUANTILE}" 'BEGIN {exit !(num > 1)}'
 then
  write_log WARNING "Maximum right-tail distribution quantile for raincloud plots should not exceed 1. Defaulting to 1"
  RP_MAX_QUANTILE=1
@@ -427,7 +427,7 @@ done
 write_log INFO "Calculating genomic scaffold lengths"
 sed -r 's/^(>\S+)\s.*/\1/' "${GENOME}" > "${GENOME}_onew_h"
 [[ -L "${GENOME}" ]] && rm "${GENOME}"
-awk '/^>/ { if (seq) print name "\t" length(seq); name = substr($0, 2); seq = ""; next } { seq = seq $0 } END { print name "\t" length(seq) }' "${GENOME}_onew_h" > scaff_lengths && rm "${GENOME}_onew_h"
+gawk '/^>/ { if (seq) print name "\t" length(seq); name = substr($0, 2); seq = ""; next } { seq = seq $0 } END { print name "\t" length(seq) }' "${GENOME}_onew_h" > scaff_lengths && rm "${GENOME}_onew_h"
 
 #Setting the number of longest genomic scaffolds for genomic location plotting of exon sets
 if [[ -z "${LONGEST_SCAFF_N}" ]]
