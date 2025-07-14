@@ -63,7 +63,7 @@ brew install bash
 - Install GNU core utilities:
 
 ```bash
-brew install coreutils findutils gnu-sed gawk grep
+brew install coreutils gnu-sed gawk
 ```
 
 - Add Bash and GNU utilities to your `PATH` (adjust path depending on your architecture):
@@ -72,18 +72,14 @@ For Apple Silicon:
 ```bash
 export PATH="/opt/homebrew/bin:$PATH"
 export PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:$PATH"
-export PATH="/opt/homebrew/opt/findutils/libexec/gnubin:$PATH"
 export PATH="/opt/homebrew/opt/gnu-sed/libexec/gnubin:$PATH"
-export PATH="/opt/homebrew/opt/grep/libexec/gnubin:$PATH"
 ```
 
 For Intel-based configurations
 ```bash
 export PATH="/usr/local/bin:$PATH"
 export PATH="/usr/local/opt/coreutils/libexec/gnubin:$PATH"
-export PATH="/usr/local/opt/findutils/libexec/gnubin:$PATH"
 export PATH="/usr/local/opt/gnu-sed/libexec/gnubin:$PATH"
-export PATH="/usr/local/opt/grep/libexec/gnubin:$PATH"
 ```
 
 - Run CATS-rb using the installed Bash version:
@@ -91,6 +87,8 @@ export PATH="/usr/local/opt/grep/libexec/gnubin:$PATH"
 ```bash
 bash CATS_rb
 ```
+
+The stated changes can be made permanent by modifying the appropriate .rc file. 
 
 ## Installing CATS-rb via conda
 
