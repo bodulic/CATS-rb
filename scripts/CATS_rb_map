@@ -112,12 +112,6 @@ test_numeric_arg () {
  fi
 }
 
-#Checking executable requirements
-check_executable Rscript spaln
-
-#Checking R package requirements
-check_r_package data.table
-
 #Defining default parameters
 STRANDNESS=3
 SAME_TR_MAP_N=5
@@ -161,6 +155,12 @@ while getopts ":SN:i:p:s:P:T:t:D:Oh" OPT; do
  esac
 done
 shift "$(( OPTIND - 1 ))"
+
+#Checking executable requirements
+check_executable Rscript spaln
+
+#Checking R package requirements
+check_r_package data.table
 
 #Displaying usage when calling the script without arguments
 if [[ "${#}" -eq 0 ]]

@@ -142,12 +142,6 @@ test_numeric_arg () {
  fi
 }
 
-#Checking executable requirements
-check_executable Rscript pandoc
-
-#Checking R package requirements
-check_r_package rmarkdown knitr data.table ggplot2 ggdist GenomicRanges Matrix igraph UpSetR ggVennDiagram egg ComplexHeatmap GenomeInfoDb GenomicDistributions
-
 #Defining default parameters
 STRANDED="F"
 MIN_EX_ID_PROP=0.98
@@ -278,6 +272,12 @@ while getopts ":Sp:e:i:M:C:l:L:m:j:J:o:P:x:d:r:b:n:u:v:y:c:q:f:B:V:H:EA:N:R:I:F:
  esac
 done
 shift "$(( OPTIND - 1 ))"
+
+#Checking executable requirements
+check_executable Rscript pandoc
+
+#Checking R package requirements
+check_r_package rmarkdown knitr data.table ggplot2 ggdist GenomicRanges Matrix igraph UpSetR ggVennDiagram egg ComplexHeatmap GenomeInfoDb GenomicDistributions
 
 #Displaying usage when calling the script without arguments
 if [[ "${#}" -eq 0 ]]

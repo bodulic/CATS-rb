@@ -76,9 +76,6 @@ test_numeric_arg () {
  fi
 }
 
-#Checking executable requirements
-check_executable spaln
-
 #Defining default parameters
 THREAD_N=10
 OVERWRITE_RES="F"
@@ -102,6 +99,9 @@ while getopts ":m:t:Oh" OPT; do
  esac
 done
 shift "$(( OPTIND - 1 ))"
+
+#Checking executable requirements
+check_executable spaln
 
 #Displaying usage when calling the script without arguments
 if [[ "${#}" -eq 0 ]]
