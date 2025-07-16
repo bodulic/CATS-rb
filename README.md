@@ -45,9 +45,11 @@ A typical CATS-rb analysis generally fits into one of the following use cases:
 
 ## Installing CATS-rb via conda
 
-CATS-rb and its dependencies can be directly installed via [Bioconda](https://bioconda.github.io/):
+CATS-rb and its dependencies can be directly installed via [Bioconda](https://anaconda.org/bioconda/cats-rb):
 
-(coming soon)
+```bash
+conda install -c bioconda cats-rb
+```
 
 ## Installing CATS-rb from source
 
