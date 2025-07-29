@@ -56,6 +56,8 @@ CATS-rb and its dependencies can be directly installed via [Bioconda](https://an
 conda install -c bioconda cats-rb
 ```
 
+In case of dependency conflicts, please see the Troubleshooting section.
+
 ## Installing CATS-rb from source
 
 CATS-rb consists of Bash and R scripts located in the `scripts` directory of this repository. After cloning the repository, all CATS-rb scripts must be included in the `PATH` environment variable.
@@ -132,7 +134,7 @@ CATS-rb workflow consists of three scripts which should be run in succession:
 
 ## Genome index generation script: `CATS_rb_index`
 
-`CATS_rb_index` generates the Spaln genome index for the reference genome. The reference genome does not need to be repeat-masked.
+CATS-rb maps transcripts to the reference genome using Spaln. The first step is performed by `CATS_rb_index`, which generates the Spaln genome index for the reference genome. The reference genome does not need to be repeat-masked.
 
 Example usage:
 ```bash
@@ -153,6 +155,8 @@ CATS_rb_map [OPTIONS] GENOME_INDEX_DIR TRANSCRIPTOME
 `CATS_rb_compare` compares the mapped transcriptome assemblies. Optionally, a reference GTF/GFF3 gene annotation file can be supplied.
 
 While `CATS_rb_compare` is primarily designed to compare multiple transcriptome assemblies, it can also be used with a single assembly. However, the output will not contain relative completeness analysis.
+
+The most important optional parameters which should be set according to the analysed organism are maximum intron length (`-i`), maximum transcript set length for completeness analysis (`-m`), and the number of longest genomic scaffolds for exon set genomic location plot ( `-f`). See the detailed options section for further explanation.
 
 Example usage without reference annotation:
 ```bash
