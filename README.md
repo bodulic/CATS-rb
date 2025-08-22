@@ -296,7 +296,7 @@ All color sets (parameters `r`, `b`, `n`, `u`, `v`, `y`, and `c`) should be supp
 
 `-n`: Exon set genomic location plot colors (quoted hexadecimal codes or R color names, specified with x,y,z...), default: adjusted Set1 palette from RColorBrewer package
 
-`-u`: UpSet plot bar and matrix colors (quoted hexadecimal codes or R color names, specified with x,y,z...), default: "#FDAF4A,#DC151D"
+`-u`: UpSet plot bar and matrix colors (quoted hexadecimal codes or R color names, specified with x,y), default: "#FDAF4A,#DC151D"
 
 `-v`: Venn diagram colors (quoted hexadecimal codes or R color names, specified with x,y,z...), default: adjusted Reds palette from RColorBrewer package
 
@@ -334,7 +334,7 @@ Proportion of aligned transcript is split into intervals defined by `A` (e.g. [0
 
 All category variable breaks (`A`, `N`, `R`, `I`, and `s`) should be supplied as strings separated with commas and enclosed in quotes (e.g. "0,0.2,0.4,0.6,0.8,0.85,0.9,0.95,1").
 
-`-N`: Number of exons per transcript distribution breakpoints (specified with x,y,z...), default: "0,2,4,6,8,10,15,20"
+`-N`: Number of exons per transcript distribution breakpoints (specified with x,y,z...), default: "1,2,4,6,8,10,15,20"
 
 Number of exons per transcript is split into intervals defined by `N` (e.g. [0-2>, [2-4>...). This category variable is used for plotting.
 
@@ -342,7 +342,7 @@ Number of exons per transcript is split into intervals defined by `N` (e.g. [0-2
 
 Common element set relative length is split into intervals defined by `R` (e.g. [0-0.2>, [0.2-0.4>...). This category variable is used for plotting.
 
-`-I`: Number of isoforms per transcript set distribution breakpoints (specified with x,y,z...), default: "0,2,4,6,8,10,15,20"
+`-I`: Number of isoforms per transcript set distribution breakpoints (specified with x,y,z...), default: "1,2,4,6,8,10,15,20"
 
 Number of isoforms per transcript set is split into intervals defined by `I` (e.g. [0-2>, [2-4>...). This category variable is used for plotting.
 
