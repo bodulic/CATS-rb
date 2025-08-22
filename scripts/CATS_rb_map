@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #Defining usage and exiting (function)
 usage () {
- echo "CATS-rb version 1.0.0 - transcriptome assembly mapping script" >&2
+ echo "CATS-rb version 1.0.2 - transcriptome assembly mapping script" >&2
  echo "USAGE ${0} [OPTIONS] GENOME_INDEX_DIR TRANSCRIPTOME" >&2
  echo "Mapping options:" >&2
  echo "-S: Enable stranded mapping, default: off" >&2
@@ -40,7 +40,7 @@ check_executable () {
 }
 
 #Checking R package installation (function)
-check_r_package() {
+check_r_package () {
  for R_PACKAGE in "${@}"
  do
   Rscript -e "if (!requireNamespace('${R_PACKAGE}', quietly=T)) quit(status=1)" >/dev/null 2>&1 || {
@@ -51,7 +51,7 @@ check_r_package() {
 }
 
 #Checking the supplied directories (function)
-check_directories() {
+check_directories () {
  for DIRECTORY in "${@}"
  do
   if [[ -d "${DIRECTORY}" ]]
@@ -69,7 +69,7 @@ check_directories() {
 }
 
 #Checking the supplied files (function)
-check_files() {
+check_files () {
  for FILE in "${@}"
  do
   if [[ -f "${FILE}" ]]
@@ -157,7 +157,7 @@ done
 shift "$(( OPTIND - 1 ))"
 
 #Checking executable requirements
-check_executable Rscript spaln
+check_executable gawk Rscript spaln
 
 #Checking R package requirements
 check_r_package data.table
@@ -174,7 +174,7 @@ exec 3>&2
 exec 2> >(tee "$LOG_FILE" >&3)
 
 #Printing welcome message
-echo "Welcome to CATS-rb transcriptome assembly mapping tool (version 1.0.0). Find us on https://github.com/bodulic/CATS-rb/tree/main"
+echo "Welcome to CATS-rb transcriptome assembly mapping tool (version 1.0.2). Find us on https://github.com/bodulic/CATS-rb"
 
 #Checking if the correct number of files / directories is supplied
 if [[ "${#}" -ne 2 ]]

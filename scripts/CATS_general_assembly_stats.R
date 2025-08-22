@@ -20,14 +20,12 @@ tr_N <- tr_lengths[, .N]
 base_N_sum <- sum(tr_lengths[, tr_len])
 tr_len_summary <- summary(tr_lengths[, tr_len])
 
+#Calculating the number of transcripts longer than N bp
 tr_longer_than_N <- c()
+tr_longer_than_label <- c()
 len_thr <- c(200, 500, 1000, 5000, 10000, 20000)
 for (i in 1 : length(len_thr)) {
  tr_longer_than_N[i] <- tr_lengths[tr_len > len_thr[i], .N]
-}
-
-tr_longer_than_label <- c()
-for (i in 1 : length(len_thr)) {
  tr_longer_than_label[i] <- paste("N, % transcripts longer than", len_thr[i], "bp")
 }
 

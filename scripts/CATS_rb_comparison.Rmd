@@ -86,7 +86,7 @@ import_data <- function(import_regex) {
    if (i == 1) {
     imported_dt <- fread(files_in_directory[i], sep = "\t", header = F)
    } else {
-    imported_dt <- cbind(imported_dt, fread(files_in_directory[i], header = F, select = 2, sep = "\t"))  
+    imported_dt <- cbind(imported_dt, fread(files_in_directory[i], sep = "\t", header = F, select = 2))  
    }
   }
   colnames(imported_dt)[-1] <- transcriptome_names
@@ -144,7 +144,7 @@ analyse_numerical_variable <- function(dt_to_analyse, variable_to_plot, plot_axi
   stat_halfeye(normalize = "groups", width = 0.9, justification = -0.1, .width = 0, point_colour = NA, alpha = 0.8) +
   geom_boxplot(width = 0.1, outlier.shape = NA, alpha = 0.8) +
   theme_bw() +
-  scale_fill_manual(values = RP_COLORS) +
+  scale_fill_manual(values = RP_COLORS[TRANSCRIPTOME_N : 1]) +
   theme(legend.position = "none") +
   coord_flip() +
   scale_y_log10(limits = c(plotted_value_min, plotted_value_max)) +
@@ -194,7 +194,7 @@ analyse_categorical_variable <- function(dt_to_analyse, variable_to_plot, break_
   geom_bar(position = "fill",  width = BP_BP3_BAR_WIDTH, color = "black", alpha = 0.85) +
   theme_bw() +
   scale_fill_manual(values = BP_COLORS[(length(BP_COLORS) - length(var_cat_levels) + 1) : length(BP_COLORS)], name = plot_legend_title_filename) +
-  guides(fill = guide_legend(nrow = ceiling(length(var_cat_levels) / 5), byrow = T)) +
+  guides(fill = guide_legend(nrow = ceiling(length(var_cat_levels) / 4), byrow = T)) +
   theme(legend.position = "top") +
   xlab("Transcriptome") +
   ylab(paste(y_axis_label, "proportion")) +
@@ -246,10 +246,11 @@ sort_by_indices <- function(ind_vec, vec_to_sort) {
 #Generating Venn diagrams (function)
 generate_venn_diagram <- function(dt_for_venn, plot_filename) {
  variable_wd_plots <- list()
+ dt_for_venn[, "row_N" := .I]
  for(i in all_trans_pairs) {
   first_element <- sub("(.*),pair,.*", "\\1", i)
   second_element <- sub(".*,pair,(.*)", "\\1", i)
-  el_set_row_N_for_venn <- list(dt_for_venn[get(first_element) >= VD_MIN_OVL_PROP, .I], dt_for_venn[get(second_element) >= VD_MIN_OVL_PROP, .I])
+  el_set_row_N_for_venn <- list(dt_for_venn[get(first_element) >= VD_MIN_OVL_PROP, row_N], dt_for_venn[get(second_element) >= VD_MIN_OVL_PROP, row_N])
   
   variable_wd <-  ggVennDiagram(el_set_row_N_for_venn, category.names = c(first_element, second_element), set_size = WD_TR_LABEL_SIZE, label = "both", label_percent_digit = 1, label_alpha = 0, label_size = WD_N_LABEL_SIZE) +
    scale_color_manual(values = c("grey40", "grey40")) +
@@ -259,7 +260,7 @@ generate_venn_diagram <- function(dt_for_venn, plot_filename) {
    scale_x_continuous(expand = expansion(mult = .2)) 
   variable_wd_plots[[i]] <- variable_wd
  }
- 
+ dt_for_venn[, "row_N" := NULL]
  variable_wd_plots <- egg::ggarrange(plots = variable_wd_plots, nrow = WD_ROW_N, draw = F)
  ggsave(variable_wd_plots, filename = paste(plot_filename, FIGURE_EXT, sep = "."), height = WD_HEIGHT_WIDTH, width = WD_HEIGHT_WIDTH, dpi = FIGURE_DPI)
 } 
@@ -318,7 +319,7 @@ compare_element_sets <- function(element_set_cat) {
  
  transcriptome_list <- element_sets[, .(transcriptome_list = list(transcriptome)), by = "group_id"][, transcriptome_list]
  length_list <- element_sets[, .(length_list = list(width)), by = "group_id"][, length_list]
- group_id_vec <- element_sets[, group_id]
+ group_id_vec <- unique(element_sets[, group_id])
  rm(element_sets)
  remove_indices_list <- lapply(transcriptome_list, function(x) which(duplicated(x)))
  transcriptome_list <- Map(function(x, y) x[!seq_along(x) %in% y], transcriptome_list, remove_indices_list)
@@ -421,7 +422,7 @@ compare_element_sets <- function(element_set_cat) {
   theme(axis.text.y = element_text(size = TP_LABEL_SIZE)) +
   ggtitle(paste0(toupper(substr(element_set_cat, 1, 1)), substr(element_set_cat, 2, nchar(element_set_cat)), " similarity scores")) +
   theme(plot.title = element_text(size = TP_TITLE_SIZE))
- ggsave(element_set_tp, filename = paste(paste(sub(" ", "_", element_set_cat, fixed = T), "pairwise_comp_similarity_tileplot", sep = "_"), FIGURE_EXT, sep = "."), height = TP_HEIGHT, width = TP_WIDTH, dpi = FIGURE_DPI) 
+ ggsave(element_set_tp, filename = paste(paste(sub(" ", "_", element_set_cat, fixed = T), "pairwise_comp_similarity_tileplot", sep = "_"), FIGURE_EXT, sep = "."), height = TP_HEIGHT, width = TP_WIDTH, dpi = FIGURE_DPI, bg = "white") 
  rm(comp_similarity_dt, element_set_tp)
  
  element_set_groups[, "longest_element" := do.call(pmax, .SD)]
@@ -491,7 +492,6 @@ compare_element_set_annot <- function(element_set_cat)  {
  el_set_precision_dt <- list()
  el_set_ovl_prop_dt <- list()
  el_set_recall_dt <- list()
- annot_len_dep_el_scores <- c()
  gtf_set_ovl_prop_dt <- data.table()
  for(i in 1 : TRANSCRIPTOME_N) {
   element_set_gr_trans <- element_set_gr[mcols(element_set_gr)$transcriptome == transcriptome_names[i]]
@@ -572,7 +572,7 @@ compare_element_set_annot <- function(element_set_cat)  {
   if (gtf_set_ovl_prop_matrix_hp_sd != 0) {
    element_set_annot_hp <- Heatmap(gtf_set_ovl_prop_matrix_hp, cluster_rows = T, show_row_dend = F, cluster_columns = T, show_column_dend = T, show_row_names = F, show_column_names = T , column_title = paste("Annotation-based", element_set_cat, "heatmap", sep = " "), column_names_rot = 90, column_names_gp = grid::gpar(fontsize = BP_HP_GP_BP3_LABEL_SIZE), col = HP_COLORS, name = "Completeness", use_raster = HP_RASTER)
    pdf(paste("annotation-based", sub(" ", "_", element_set_cat, fixed = T), "heatmap_plot.pdf", sep = "_"), height = HP_HEIGHT, width = HP_WIDTH)
-   draw(element_set_annot_hp)
+   print(element_set_annot_hp)
    dev.off()
   } else {
    element_set_annot_hp <- NULL  
@@ -659,7 +659,7 @@ UP_HEIGHT <- c(6, 8, 11, 12, 13, 14, 15, 16, 17, 18)[findInterval(TRANSCRIPTOME_
 TP_TILE_LABEL_ROUND <- c(2, 1)[findInterval(TRANSCRIPTOME_N, c(0, 51, Inf))]
 TP_TILE_LABEL_SIZE <- c(4.5, 4, 3.3, 2.3, 2)[findInterval(TRANSCRIPTOME_N, c(0, 21, 41, 81, 93, Inf))]
 TP_LABEL_SIZE <- c(9, 8, 7)[findInterval(TR_NAME_LEN_MAX, c(0, 15, 22, Inf))]
-TP_TITLE_SIZE <- TP_LABEL_SIZE + 3
+TP_TITLE_SIZE <- TP_LABEL_SIZE + 2
 TP_HEIGHT <- c(2, 3.5, 7.5, 9.5, 12, 15, 16, 17, 18, 19, 20)[findInterval(TRANSCRIPTOME_N, c(0, 4, 6, 11, 18, 24, 31, 41, 51, 71, 101, Inf))]
 TP_WIDTH <- TP_HEIGHT + 1
 HP_HEIGHT <- c(5, 6, 7, 8, 9, 10, 11, 12, 13, 14)[findInterval(HP_EL_N, c(0, 6500, 13000, 19500, 26000, 32500, 39000, 45500, 52000, 58500, 65000))]
@@ -861,9 +861,10 @@ rm(tr_map_N)
 
 #Structural inconsistency analysis - transcript segments mapping to disjunct genomic regions
 if (transcripts[map_N != 1, .N] != 0) {
- multimapped_tr <- transcripts[tr_name %chin% unique(transcripts[map_N > 1, tr_name]) & tr_name !="SRR33339778_IDB,trs,contig-60_0"]
+ multimapped_tr <- transcripts[tr_name %chin% unique(transcripts[map_N > 1, tr_name])]
  multimapped_tr_gr <- makeGRangesFromDataFrame(multimapped_tr, seqnames.field  = "tr_name", start.field = "tr_start", end.field = "tr_end", ignore.strand = T, keep.extra.columns = T)
- multimapped_tr_gr_nearest_k <- nearestKNeighbors(multimapped_tr_gr, k = max(multimapped_tr[, map_N]) - 1, ignore.strand = T)
+ multimapped_tr_gr_nearest_k <- tryCatch({nearestKNeighbors(multimapped_tr_gr, k = max(multimapped_tr[, map_N]) - 1, ignore.strand = T)
+}, error = function(e) { IntegerList(as.list(nearest(multimapped_tr_gr, ignore.strand = T)))})
  rm(multimapped_tr_gr)
  multimapped_tr[, "map_N" := NULL]
  multimapped_tr_tmp <- multimapped_tr[rep(1 : multimapped_tr[, .N], elementNROWS(multimapped_tr_gr_nearest_k))]
@@ -949,7 +950,7 @@ rm(exon_mapping_N)
 
 #Calculating and plotting the number of exons per transcript
 per_tr_exon_N <- exon_mappings[, .(exon_N = .N), by = c("tr_name", "transcriptome")]
-exon_N_stats <- analyse_categorical_variable(per_tr_exon_N, "exon_N", EXON_PER_TR_N_BREAKS, "Number of exons per transcript", "Exon")
+exon_N_stats <- analyse_categorical_variable(per_tr_exon_N, "exon_N", EXON_PER_TR_N_BREAKS, "Number of exons per transcript", "Transcript")
 per_tr_exon_N[, "per_tr_exon_N_cat" := NULL]
 transcriptome_map_stats <- rbindlist(list(transcriptome_map_stats, exon_N_stats))
 rm(exon_N_stats)
@@ -969,7 +970,7 @@ transcriptome_map_stats <- rbindlist(list(transcriptome_map_stats, exon_len_stat
 rm(exon_len_stats)
 
 #Generating transcriptome assembly mapping statistics
-transcriptome_map_stat_params <- data.table(c("N, % unmapped transcripts", "Transcript alignment proportion (mean, IQR)", "N, % multimapped transcripts", "N, % structural inconsistent transcripts", "N exons", "N exons per transcript (mean, IQR)", "Exon length (bp) (mean, IQR)"))
+transcriptome_map_stat_params <- data.table(c("N, % unmapped transcripts", "Transcript alignment proportion (mean, IQR)", "N, % multimapped transcripts", "N, % structurally inconsistent transcripts", "N exons", "N exons per transcript (mean, IQR)", "Exon length (bp) (mean, IQR)"))
 transcriptome_map_stats <- cbind(transcriptome_map_stat_params, transcriptome_map_stats)
 rm(transcriptome_map_stat_params)
 colnames(transcriptome_map_stats) <- c("Parameter", transcriptome_names)
@@ -980,7 +981,7 @@ colnames(transcriptome_map_stats) <- c("Parameter", transcriptome_names)
 #Displaying the transcript length raincloud plot
 knitr::include_graphics(paste("transcript_length", FIGURE_EXT, sep = "."))
 ```
-**Figure 1.** Transcript length distribution.
+**Figure 1.** Transcript length distribution (in bp).
 <br>
 <br>
 
@@ -1016,7 +1017,7 @@ knitr::include_graphics(paste("number_of_exons_per_transcript", FIGURE_EXT, sep 
 #Displaying the exon length raincloud plot
 knitr::include_graphics(paste("exon_length", FIGURE_EXT, sep = "."))
 ```
-**Figure 4.** Exon length distribution.
+**Figure 4.** Exon length distribution (in bp).
 <br>
 <br>
 
@@ -1041,13 +1042,14 @@ setorder(scaff_lengths, -V2)
 scaff_lengths <- scaff_lengths[1 : LONGEST_SCAFF_N]
 setnames(scaff_lengths, c("scaff", "scaff_len"))
 
-#Defining exon sets and performing exon set genomic distribution analysis
+#Defining genomic bins
 scaff_length_vec <- scaff_lengths[, scaff_len]
 names(scaff_length_vec) <- scaff_lengths[, scaff]
 rm(scaff_lengths)
 genomic_bins <- getGenomeBins(scaff_length_vec, binCount = GENOMIC_BIN_N)
 rm(scaff_length_vec)
 
+#Defining exon sets. Performing exon set genomic distribution analysis
 if (STRANDED == F) {
  exon_gr <- makeGRangesFromDataFrame(exon_mappings, seqnames.field = "scaff_name", start.field = "exon_scaff_start", end.field = "exon_scaff_end", ignore.strand = T, keep.extra.columns = F)
 } else {
@@ -1375,7 +1377,7 @@ IQR = interquartile range
 #Displaying the exon set length raincloud plot
 knitr::include_graphics(paste("exon_set_length", FIGURE_EXT, sep = "."))
 ```
-**Figure 5.** Exon set length distribution.
+**Figure 5.** Exon set length distribution (in bp).
 <br>
 <br>
 
@@ -1419,7 +1421,7 @@ if (TRANSCRIPTOME_N > 1) {
  print("Common element sets are not defined in single-transcriptome analyses")
 }
 ```
-**Figure 8.**  Common exon set length distribution.
+**Figure 8.**  Common exon set length distribution (in bp).
 <br>
 <br>
 
@@ -1451,7 +1453,7 @@ if (TRANSCRIPTOME_N > 1) {
  print("Unique element sets are not defined in single-transcriptome analyses")
 }
 ```
-**Figure 10.**  Unique exon set length distribution.
+**Figure 10.**  Unique exon set length distribution (in bp).
 <br>
 <br>
 
@@ -1621,7 +1623,7 @@ IQR = interquartile range
 #Displaying the transcript set length raincloud plot
 knitr::include_graphics(paste("transcript_set_length", FIGURE_EXT, sep = "."))
 ```
-**Figure 14.**  Transcript set length distribution.
+**Figure 14.**  Transcript set length distribution (in bp).
 <br>
 <br>
 
@@ -1665,7 +1667,7 @@ if (TRANSCRIPTOME_N > 1) {
  print("Common element sets are not defined in single-transcriptome analyses")
 }
 ```
-**Figure 17.**  Common transcript set length distribution.
+**Figure 17.**  Common transcript set length distribution (in bp).
 <br>
 <br>
 
@@ -1697,7 +1699,7 @@ if (TRANSCRIPTOME_N > 1) {
  print("Unique element sets are not defined in single-transcriptome analyses")
 }
 ```
-**Figure 19.**  Unique transcript set length distribution.
+**Figure 19.**  Unique transcript set length distribution (in bp).
 <br>
 <br>
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #Defining usage and exiting (function)
 usage () {
- echo "CATS-rb version 1.0.0 - transcriptome assembly comparison script" >&2
- echo "USAGE ${0} [OPTIONS] GENOME TRANSCRIPTOME_MAP_DIR ..." >&2
+ echo "CATS-rb version 1.0.2 - transcriptome assembly comparison script" >&2
+ echo "USAGE ${0} [OPTIONS] GENOME TRANSCRIPTOME_MAP_DIR1 ..." >&2
  echo "Mapping comparison options:" >&2
  echo "-S: Enable stranded analysis, default: off" >&2
  echo "-p: Minimum exon identity proportion, default: 0.98" >&2
@@ -22,7 +22,7 @@ usage () {
  echo "-r: Raincloud plot colors (quoted hexadecimal codes or R color names, specified with x,y,z...), default: adjusted Set1 palette from RColorBrewer package" >&2
  echo "-b: Barplot colors (quoted hexadecimal codes or R color names, specified with x,y,z...), default: adjusted YlOrRd palette from RColorBrewer package" >&2
  echo "-n: Exon set genomic location plot colors (quoted hexadecimal codes or R color names, specified with x,y,z...), default: adjusted Set1 palette from RColorBrewer package" >&2
- echo "-u: UpSet plot bar and matrix colors (quoted hexadecimal codes or R color names, specified with x,y,z...), default: #FDAF4A,#DC151D" >&2
+ echo "-u: UpSet plot bar and matrix colors (quoted hexadecimal codes or R color names, specified with x,y), default: #FDAF4A,#DC151D" >&2
  echo "-v: Venn diagram colors (quoted hexadecimal codes or R color names, specified with x,y,z...), default: adjusted Reds palette from RColorBrewer package" >&2
  echo "-y: Pairwise similarity tileplot colors (quoted hexadecimal codes or R color names, specified with x,y,z...), default: adjusted YlOrRd palette from RColorBrewer package" >&2
  echo "-c: Hierarchical clustering heatmap colors (quoted hexadecimal codes or R color names, specified with x,y,z...), default: adjusted YlOrRd palette from RColorBrewer package" >&2
@@ -33,9 +33,9 @@ usage () {
  echo "-H: Number of longest element sets used in hierarchical clustering, default: 5000" >&2
  echo "-E: Use raster for heatmap plotting, default: off" >&2
  echo "-A: Proportion of aligned transcript distribution breakpoints (specified with x,y,z...), default: 0,0.2,0.4,0.6,0.8,0.85,0.9,0.95,1" >&2
- echo "-N: Number of exons per transcript distribution breakpoints (specified with x,y,z...), default: 0,2,4,6,8,10,15,20" >&2
+ echo "-N: Number of exons per transcript distribution breakpoints (specified with x,y,z...), default: 1,2,4,6,8,10,15,20" >&2
  echo "-R: Common element set relative length distribution breakpoints (specified with x,y,z...), default: 0,0.2,0.4,0.6,0.8,0.85,0.9,0.95,1" >&2
- echo "-I: Number of isoforms per transcript set distribution breakpoints (specified with x,y,z...), default: 0,2,4,6,8,10,15,20" >&2
+ echo "-I: Number of isoforms per transcript set distribution breakpoints (specified with x,y,z...), default: 1,2,4,6,8,10,15,20" >&2
  echo "Annotation-based analysis options (requires a GTF/GFF3 file to be supplied):" >&2
  echo "-F: GTF/GFF3 file for the annotation-based analysis" >&2
  echo "-g: Minimum proportion of an exon set that must be covered to be considered a match to a GTF exon set (and vice versa); default: 0.35" >&2
@@ -70,7 +70,7 @@ check_executable () {
 }
 
 #Checking R package installation (function)
-check_r_package() {
+check_r_package () {
  for R_PACKAGE in "${@}"
  do
   Rscript -e "if (!requireNamespace('${R_PACKAGE}', quietly=T)) quit(status=1)" >/dev/null 2>&1 || {
@@ -81,7 +81,7 @@ check_r_package() {
 }
 
 #Checking the supplied files (function)
-check_files() {
+check_files () {
  for FILE in "${@}"
  do
   if [[ -f "${FILE}" ]]
@@ -99,7 +99,7 @@ check_files() {
 }
 
 #Checking the supplied directories (function)
-check_directories() {
+check_directories () {
  for DIRECTORY in "${@}"
  do
   if [[ -d "${DIRECTORY}" ]]
@@ -171,9 +171,9 @@ VD_MIN_OVL_PROP=0.35
 HP_EL_N=5000
 HP_RASTER="F"
 TR_ALN_PROP_BREAKS="0,0.2,0.4,0.6,0.8,0.85,0.9,0.95,1"
-EXON_PER_TR_N_BREAKS="0,2,4,6,8,10,15,20"
+EXON_PER_TR_N_BREAKS="1,2,4,6,8,10,15,20"
 COMM_EL_SET_REL_BREAKS="0,0.2,0.4,0.6,0.8,0.85,0.9,0.95,1"
-ISO_N_BREAKS="0,2,4,6,8,10,15,20"
+ISO_N_BREAKS="1,2,4,6,8,10,15,20"
 MIN_EX_SET_GTF_SET_OVL_PROP=0.35
 MIN_TR_SET_GTF_SET_OVL_PROP=0.35
 EL_SET_GTF_SET_OVL_PROP_BREAKS="0,0.2,0.4,0.6,0.8,0.85,0.9,0.95,1"
@@ -274,7 +274,7 @@ done
 shift "$(( OPTIND - 1 ))"
 
 #Checking executable requirements
-check_executable Rscript pandoc
+check_executable gawk Rscript pandoc
 
 #Checking R package requirements
 check_r_package rmarkdown knitr data.table ggplot2 ggdist GenomicRanges Matrix igraph UpSetR ggVennDiagram egg ComplexHeatmap GenomeInfoDb GenomicDistributions
@@ -291,7 +291,7 @@ exec 3>&2
 exec 2> >(tee "$LOG_FILE" >&3)
 
 #Printing welcome message
-echo "Welcome to CATS-rb transcriptome assembly comparison tool (version 1.0.0). Find us on https://github.com/bodulic/CATS-rb/tree/main"
+echo "Welcome to CATS-rb transcriptome assembly comparison tool (version 1.0.2). Find us on https://github.com/bodulic/CATS-rb"
 
 #Checking if the correct number of files / directories is supplied
 if [[ "${#}" -lt 2 ]]

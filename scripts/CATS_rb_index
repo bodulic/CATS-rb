@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #Defining usage and exiting (function)
 usage () {
- echo "CATS-rb version 1.0.0 - genome index generation script" >&2
+ echo "CATS-rb version 1.0.2 - genome index generation script" >&2
  echo "USAGE ${0} [OPTIONS] GENOME" >&2
  echo "Genome index generation options:" >&2
  echo "-m: Maximum gene length (in bp), default: estimated from genome size" >&2
@@ -33,7 +33,7 @@ check_executable () {
 }
 
 #Checking the supplied files (function)
-check_files() {
+check_files () {
  for FILE in "${@}"
  do
   if [[ -f "${FILE}" ]]
@@ -115,7 +115,7 @@ exec 3>&2
 exec 2> >(tee "$LOG_FILE" >&3)
 
 #Printing welcome message
-echo "Welcome to CATS-rb genome index generation tool (version 1.0.0). Find us on https://github.com/bodulic/CATS-rb/tree/main"
+echo "Welcome to CATS-rb genome index generation tool (version 1.0.2). Find us on https://github.com/bodulic/CATS-rb"
 
 #Checking if the correct number of files is supplied
 if [[ "${#}" -ne 1 ]]
