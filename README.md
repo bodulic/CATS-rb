@@ -48,6 +48,44 @@ A typical CATS-rb analysis generally fits into one of the following use cases:
 
 # Installation 
 
+## Running CATS-rb via Docker
+
+Starting from version 1.0.2, CATS-rb can be run using Docker:
+
+Build the Docker image with:
+
+```bash
+docker pull bodulic/cats-rb
+```
+
+Run the container with:
+
+```bash
+docker run --rm -v "$PWD":/data -w /data bodulic/cats-rb CATS_rb_index
+
+docker run --rm -v "$PWD":/data -w /data bodulic/cats-rb CATS_rb_map
+
+docker run --rm -v "$PWD":/data -w /data bodulic/cats-rb CATS_rb_compare
+```
+
+## Running CATS-rb via Singularity
+
+Build the Singularity image with:
+
+```bash
+singularity build cats_rb.sif docker://bodulic/cats-rb:latest
+```
+
+Run the container with:
+
+```bash
+singularity run cats_rb.sif CATS_rb_index
+
+singularity run cats_rb.sif CATS_rb_map
+
+singularity run cats_rb.sif CATS_rb_compare
+```
+
 ## Installing CATS-rb via conda
 
 CATS-rb and its dependencies can be directly installed via [Bioconda](https://anaconda.org/bioconda/cats-rb):
@@ -474,6 +512,14 @@ Bodulić, K. and Vlahoviček, K. (2025). Comprehensive Transcriptome Quality Ass
 # Troubleshooting
 
 Please report all potential bugs in the Issues tracker.
+
+## Singularity
+
+If you run into Singularity errors involving the default `TMPDIR` environment variable, set `TMPDIR` to your current working directory so the container uses a writable location for temporary files:
+
+```bash
+TMPDR=$(pwd)
+```
 
 ## Conda installation
 
