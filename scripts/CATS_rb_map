@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #Defining usage and exiting (function)
 usage () {
- echo "CATS-rb version 1.0.2 - transcriptome assembly mapping script" >&2
+ echo "CATS-rb version 1.0.3 - transcriptome assembly mapping script" >&2
  echo "USAGE ${0} [OPTIONS] GENOME_INDEX_DIR TRANSCRIPTOME" >&2
  echo "Mapping options:" >&2
  echo "-S: Enable stranded mapping, default: off" >&2
@@ -174,7 +174,7 @@ exec 3>&2
 exec 2> >(tee "$LOG_FILE" >&3)
 
 #Printing welcome message
-echo "Welcome to CATS-rb transcriptome assembly mapping tool (version 1.0.2). Find us on https://github.com/bodulic/CATS-rb"
+echo "Welcome to CATS-rb transcriptome assembly mapping tool (version 1.0.3). Find us on https://github.com/bodulic/CATS-rb"
 
 #Checking if the correct number of files / directories is supplied
 if [[ "${#}" -ne 2 ]]
