@@ -13,6 +13,7 @@ OUT_PREF <- ext_args[3]
 setDTthreads(THREAD_N)
 tr_lengths <- fread(TR_LEN_DT_PATH, header = F, select = 2)
 setnames(tr_lengths, "tr_len")
+setorder(tr_lengths, -tr_len)
 tr_lengths[, "tr_id" := .I]
 
 #Calculating descriptive statistics of transcript length
@@ -30,7 +31,6 @@ for (i in 1 : length(len_thr)) {
 }
 
 #Calculating Nx and Lx metrics
-setorder(tr_lengths, -tr_len)
 tr_lengths[, "tr_len_cumsum" := cumsum(tr_len)]
 N_L_50 <-  tr_lengths[tr_len_cumsum >= base_N_sum * 0.5][1]
 N50 <- N_L_50[, tr_len]
