@@ -2,12 +2,13 @@
 
 <img src="cats_rb_logo.png" alt="Logo" width="750" height="160"/>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](../LICENSE)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS-brightgreen)
 [![Bioconda](https://img.shields.io/conda/vn/bioconda/cats-rb.svg)](https://anaconda.org/bioconda/cats-rb)
 [![bioRxiv](https://img.shields.io/badge/bioRxiv-10.1101/2025.07.22.666112v1-orange)](https://www.biorxiv.org/content/10.1101/2025.07.22.666112v1)
 
-# Table of Contents
+
+## Documentation
 
 - [Introduction](#introduction)
 - [Installation](installation.md)
