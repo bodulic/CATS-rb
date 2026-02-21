@@ -7,6 +7,8 @@
 [![Bioconda](https://img.shields.io/conda/vn/bioconda/cats-rb.svg)](https://anaconda.org/bioconda/cats-rb)
 [![bioRxiv](https://img.shields.io/badge/bioRxiv-10.1101/2025.07.22.666112v1-orange)](https://www.biorxiv.org/content/10.1101/2025.07.22.666112v1)
 
+Multipage documentation: https://bodulic.github.io/CATS-rb/
+
 # Table of Contents
 
 - [Introduction](#introduction)
