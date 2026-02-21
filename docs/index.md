@@ -10,14 +10,14 @@
 # Table of Contents
 
 - [Introduction](#introduction)
-- [Installation](#installation)
-- [Test data](#test-data)
-- [Example usage](#example-usage)
-- [Detailed options](#detailed-options)
-- [Output explanation](#output-explanation)
-- [Citation](#citation)
-- [Troubleshooting](#troubleshooting)
-- [Changelog](#changelog)
+- [Installation](installation.md)
+- [Test data](test-data.md)
+- [Example usage](usage.md)
+- [Detailed options](options.md)
+- [Output explanation](output.md)
+- [Citation](citation.md)
+- [Troubleshooting](troubleshooting.md)
+- [Changelog](changelog.md)
 
 # Introduction 
 
