@@ -1,5 +1,7 @@
 # Changelog
 
+Version 1.0.4: Fixed a bug concerning structurally inconsistent transcript definition. October 12, 2026.
+
 Version 1.0.3: Fixed N50/N90 calculation, September 24, 2025.
 
 Version 1.0.2: Added gawk to dependency list. Bug fixes. Code polishing, August 22, 2025.
