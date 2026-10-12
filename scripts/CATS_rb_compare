@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #Defining usage and exiting (function)
 usage () {
- echo "CATS-rb version 1.0.3 - transcriptome assembly comparison script" >&2
+ echo "CATS-rb version 1.0.4 - transcriptome assembly comparison script" >&2
  echo "USAGE ${0} [OPTIONS] GENOME TRANSCRIPTOME_MAP_DIR1 ..." >&2
  echo "Mapping comparison options:" >&2
  echo "-S: Enable stranded analysis, default: off" >&2
