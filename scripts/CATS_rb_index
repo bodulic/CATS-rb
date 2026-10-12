@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #Defining usage and exiting (function)
 usage () {
- echo "CATS-rb version 1.0.3 - genome index generation script" >&2
+ echo "CATS-rb version 1.0.4 - genome index generation script" >&2
  echo "USAGE ${0} [OPTIONS] GENOME" >&2
  echo "Genome index generation options:" >&2
  echo "-m: Maximum gene length (in bp), default: estimated from genome size" >&2
