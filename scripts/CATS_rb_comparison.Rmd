@@ -916,6 +916,10 @@ if(STRANDED == F) {
  transcripts[, "scaff_name" := sub(".$", "", scaff_name)]
 }
 
+if (str_inc_gen_pos_tr[, .N] == 0) {
+ str_inc_gen_pos_tr <- data.table(tr_name = character(), transcriptome = character())
+}
+
 #Writing transcripts whose segments map to disjunct genomic regions to file
 write.table(str_inc_gen_pos_tr, file = "transcripts_disjunct_genomic_regions.tsv", sep = "\t", row.names = F, col.names = T, quote = F)
 
